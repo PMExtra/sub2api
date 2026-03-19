@@ -1805,14 +1805,9 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 		return
 	}
 
-	// Handle Claude/Anthropic accounts
-	// For OAuth and Setup-Token accounts: return default models
-	if account.IsOAuth() {
-		response.Success(c, claude.DefaultModels)
-		return
-	}
-
-	// For API Key accounts: return models based on model_mapping
+	// Handle Claude/Anthropic accounts:
+	// - 未配置 model_mapping 时返回默认模型列表
+	// - 配置后返回映射键（保留短名展示；若映射键可标准化到默认模型，则复用其展示信息）
 	mapping := account.GetModelMapping()
 	if len(mapping) == 0 {
 		// No mapping configured, return default models
@@ -1823,11 +1818,18 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 	// Return mapped models (keys of the mapping are the available model IDs)
 	var models []claude.Model
 	for requestedModel := range mapping {
+		lookupModelID := requestedModel
+		if normalized := claude.NormalizeModelID(requestedModel); normalized != "" {
+			lookupModelID = normalized
+		}
+
 		// Try to find display info from default models
 		var found bool
 		for _, dm := range claude.DefaultModels {
-			if dm.ID == requestedModel {
-				models = append(models, dm)
+			if dm.ID == requestedModel || dm.ID == lookupModelID {
+				model := dm
+				model.ID = requestedModel
+				models = append(models, model)
 				found = true
 				break
 			}

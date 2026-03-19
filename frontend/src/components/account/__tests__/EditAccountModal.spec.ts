@@ -82,7 +82,7 @@ const ModelWhitelistSelectorStub = defineComponent({
   `
 })
 
-function buildAccount() {
+function buildAccount(overrides: Record<string, unknown> = {}) {
   return {
     id: 1,
     name: 'OpenAI Key',
@@ -104,7 +104,8 @@ function buildAccount() {
     status: 'active',
     group_ids: [],
     expires_at: null,
-    auto_pause_on_expired: false
+    auto_pause_on_expired: false,
+    ...overrides
   } as any
 }
 
@@ -154,6 +155,36 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock).toHaveBeenCalledTimes(1)
     expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toEqual({
       'gpt-5.2': 'gpt-5.2'
+    })
+  })
+
+  it('shows and persists model mapping for Anthropic OAuth accounts', async () => {
+    const account = buildAccount({
+      name: 'Claude OAuth',
+      platform: 'anthropic',
+      type: 'oauth',
+      credentials: {
+        access_token: 'oauth-token',
+        model_mapping: {
+          'claude-sonnet-4-5': 'claude-sonnet-4-5'
+        }
+      }
+    })
+    updateAccountMock.mockReset()
+    checkMixedChannelRiskMock.mockReset()
+    checkMixedChannelRiskMock.mockResolvedValue({ has_risk: false })
+    updateAccountMock.mockResolvedValue(account)
+
+    const wrapper = mountModal(account)
+
+    expect(wrapper.get('[data-testid="model-whitelist-value"]').text()).toBe('claude-sonnet-4-5')
+
+    await wrapper.get('[data-testid="rewrite-to-snapshot"]').trigger('click')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toEqual({
+      'gpt-5.2-2025-12-11': 'gpt-5.2-2025-12-11'
     })
   })
 })

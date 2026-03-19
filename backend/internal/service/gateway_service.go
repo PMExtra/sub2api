@@ -904,7 +904,32 @@ func stripCacheControlFromSystemBlocks(system any) bool {
 	return changed
 }
 
-func normalizeClaudeOAuthRequestBody(body []byte, modelID string, opts claudeOAuthNormalizeOptions) ([]byte, string) {
+func resolveAnthropicModelForAccount(account *Account, requestedModel string) (mappedModel string, source string) {
+	if strings.TrimSpace(requestedModel) == "" {
+		return requestedModel, ""
+	}
+	if account == nil {
+		return requestedModel, ""
+	}
+
+	if mappedModel, matched := account.ResolveMappedModel(requestedModel); matched {
+		return mappedModel, "account"
+	}
+
+	if account.Platform == PlatformAnthropic && account.Type != AccountTypeAPIKey {
+		normalizedModel := claude.NormalizeModelID(requestedModel)
+		if normalizedModel != requestedModel {
+			if mappedModel, matched := account.ResolveMappedModel(normalizedModel); matched {
+				return mappedModel, "account_normalized"
+			}
+			return normalizedModel, "prefix"
+		}
+	}
+
+	return requestedModel, ""
+}
+
+func normalizeClaudeOAuthRequestBody(body []byte, account *Account, modelID string, opts claudeOAuthNormalizeOptions) ([]byte, string) {
 	if len(body) == 0 {
 		return body, modelID
 	}
@@ -948,10 +973,10 @@ func normalizeClaudeOAuthRequestBody(body []byte, modelID string, opts claudeOAu
 	}
 
 	if rawModel, ok := req["model"].(string); ok {
-		normalized := claude.NormalizeModelID(rawModel)
-		if normalized != rawModel {
-			req["model"] = normalized
-			modelID = normalized
+		resolvedModel, _ := resolveAnthropicModelForAccount(account, rawModel)
+		if resolvedModel != rawModel {
+			req["model"] = resolvedModel
+			modelID = resolvedModel
 			modified = true
 		}
 	}
@@ -3378,9 +3403,15 @@ func (s *GatewayService) isModelSupportedByAccount(account *Account, requestedMo
 		_, ok := ResolveBedrockModelID(account, requestedModel)
 		return ok
 	}
-	// OAuth/SetupToken 账号使用 Anthropic 标准映射（短ID → 长ID）
 	if account.Platform == PlatformAnthropic && account.Type != AccountTypeAPIKey {
-		requestedModel = claude.NormalizeModelID(requestedModel)
+		if account.IsModelSupported(requestedModel) {
+			return true
+		}
+		normalizedModel := claude.NormalizeModelID(requestedModel)
+		if normalizedModel != requestedModel {
+			return account.IsModelSupported(normalizedModel)
+		}
+		return false
 	}
 	// 其他平台使用账户的模型支持检查
 	return account.IsModelSupported(requestedModel)
@@ -4043,7 +4074,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			}
 		}
 
-		body, reqModel = normalizeClaudeOAuthRequestBody(body, reqModel, normalizeOpts)
+		body, reqModel = normalizeClaudeOAuthRequestBody(body, account, reqModel, normalizeOpts)
 	}
 
 	// OAuth/SetupToken 账号：移除黑名单前缀匹配的 system 元素（如客户端注入的计费元数据）
@@ -4057,22 +4088,8 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 
 	// 应用模型映射：
 	// - APIKey 账号：使用账号级别的显式映射（如果配置），否则透传原始模型名
-	// - OAuth/SetupToken 账号：使用 Anthropic 标准映射（短ID → 长ID）
-	mappedModel := reqModel
-	mappingSource := ""
-	if account.Type == AccountTypeAPIKey {
-		mappedModel = account.GetMappedModel(reqModel)
-		if mappedModel != reqModel {
-			mappingSource = "account"
-		}
-	}
-	if mappingSource == "" && account.Platform == PlatformAnthropic && account.Type != AccountTypeAPIKey {
-		normalized := claude.NormalizeModelID(reqModel)
-		if normalized != reqModel {
-			mappedModel = normalized
-			mappingSource = "prefix"
-		}
-	}
+	// - OAuth/SetupToken 账号：优先使用账号级 model_mapping / 白名单，未命中时再回退到 Anthropic 标准短名映射
+	mappedModel, mappingSource := resolveAnthropicModelForAccount(account, reqModel)
 	if mappedModel != reqModel {
 		// 替换请求体中的模型名
 		body = s.replaceModelInBody(body, mappedModel)
@@ -7855,7 +7872,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 
 	if shouldMimicClaudeCode {
 		normalizeOpts := claudeOAuthNormalizeOptions{stripSystemCacheControl: true}
-		body, reqModel = normalizeClaudeOAuthRequestBody(body, reqModel, normalizeOpts)
+		body, reqModel = normalizeClaudeOAuthRequestBody(body, account, reqModel, normalizeOpts)
 	}
 
 	// Antigravity 账户不支持 count_tokens，返回 404 让客户端 fallback 到本地估算。
@@ -7867,23 +7884,9 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 
 	// 应用模型映射：
 	// - APIKey 账号：使用账号级别的显式映射（如果配置），否则透传原始模型名
-	// - OAuth/SetupToken 账号：使用 Anthropic 标准映射（短ID → 长ID）
+	// - OAuth/SetupToken 账号：优先使用账号级 model_mapping / 白名单，未命中时再回退到 Anthropic 标准短名映射
 	if reqModel != "" {
-		mappedModel := reqModel
-		mappingSource := ""
-		if account.Type == AccountTypeAPIKey {
-			mappedModel = account.GetMappedModel(reqModel)
-			if mappedModel != reqModel {
-				mappingSource = "account"
-			}
-		}
-		if mappingSource == "" && account.Platform == PlatformAnthropic && account.Type != AccountTypeAPIKey {
-			normalized := claude.NormalizeModelID(reqModel)
-			if normalized != reqModel {
-				mappedModel = normalized
-				mappingSource = "prefix"
-			}
-		}
+		mappedModel, mappingSource := resolveAnthropicModelForAccount(account, reqModel)
 		if mappedModel != reqModel {
 			body = s.replaceModelInBody(body, mappedModel)
 			reqModel = mappedModel

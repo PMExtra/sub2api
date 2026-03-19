@@ -1134,6 +1134,30 @@ func TestGatewayService_isModelSupportedByAccount(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "Anthropic OAuth-短名称请求可命中长ID白名单",
+			account: &Account{
+				Platform: PlatformAnthropic,
+				Type:     AccountTypeOAuth,
+				Credentials: map[string]any{
+					"model_mapping": map[string]any{"claude-sonnet-4-5-20250929": "x"},
+				},
+			},
+			model:    "claude-sonnet-4-5",
+			expected: true,
+		},
+		{
+			name: "Anthropic OAuth-短名称请求不会误命中其他长ID白名单",
+			account: &Account{
+				Platform: PlatformAnthropic,
+				Type:     AccountTypeOAuth,
+				Credentials: map[string]any{
+					"model_mapping": map[string]any{"claude-opus-4-5-20251101": "x"},
+				},
+			},
+			model:    "claude-sonnet-4-5",
+			expected: false,
+		},
+		{
 			name:     "Gemini平台-无映射配置-支持所有模型",
 			account:  &Account{Platform: PlatformGemini, Type: AccountTypeAPIKey},
 			model:    "gemini-2.5-flash",

@@ -210,9 +210,9 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 		testModelID = claude.DefaultTestModel
 	}
 
-	// API Key 账号测试连接时也需要应用通配符模型映射。
-	if account.Type == "apikey" {
-		testModelID = account.GetMappedModel(testModelID)
+	// Claude 账号测试连接时统一沿用网关的 Anthropic 模型解析规则。
+	if account.Platform == PlatformAnthropic {
+		testModelID, _ = resolveAnthropicModelForAccount(account, testModelID)
 	}
 
 	// Bedrock accounts use a separate test path

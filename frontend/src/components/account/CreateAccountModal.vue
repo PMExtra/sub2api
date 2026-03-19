@@ -1586,9 +1586,9 @@
         />
       </div>
 
-      <!-- OpenAI OAuth Model Mapping (OAuth 类型没有 apikey 容器，需要独立的模型映射区域) -->
+      <!-- OAuth/SetupToken Model Mapping (这些类型没有 apikey 容器，需要独立的模型映射区域) -->
       <div
-        v-if="form.platform === 'openai' && accountCategory === 'oauth-based'"
+        v-if="showStandaloneOAuthModelRestriction"
         class="border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <label class="input-label">{{ t('admin.accounts.modelRestriction') }}</label>
@@ -3131,6 +3131,10 @@ const openAIWSModeConcurrencyHintKey = computed(() =>
 
 const isOpenAIModelRestrictionDisabled = computed(() =>
   form.platform === 'openai' && openaiPassthroughEnabled.value
+)
+const showStandaloneOAuthModelRestriction = computed(() =>
+  accountCategory.value === 'oauth-based' &&
+  (form.platform === 'openai' || form.platform === 'anthropic')
 )
 
 const mixedChannelWarningMessageText = computed(() => {
@@ -4823,6 +4827,10 @@ const handleAnthropicExchange = async (authCode: string) => {
     }
 
     const credentials: Record<string, unknown> = { ...tokenInfo }
+    const modelMapping = buildModelMappingObject(modelRestrictionMode.value, allowedModels.value, modelMappings.value)
+    if (modelMapping) {
+      credentials.model_mapping = modelMapping
+    }
     applyInterceptWarmup(credentials, interceptWarmupRequests.value, 'create')
     await createAccountAndFinish(form.platform, addMethod.value as AccountType, credentials, extra)
   } catch (error: any) {
@@ -4940,6 +4948,10 @@ const handleCookieAuth = async (sessionKey: string) => {
         const accountName = keys.length > 1 ? `${form.name} #${i + 1}` : form.name
 
         const credentials: Record<string, unknown> = { ...tokenInfo }
+        const modelMapping = buildModelMappingObject(modelRestrictionMode.value, allowedModels.value, modelMappings.value)
+        if (modelMapping) {
+          credentials.model_mapping = modelMapping
+        }
         applyInterceptWarmup(credentials, interceptWarmupRequests.value, 'create')
         if (tempUnschedEnabled.value) {
           credentials.temp_unschedulable_enabled = true

@@ -403,9 +403,9 @@
 
       </div>
 
-      <!-- OpenAI OAuth Model Mapping (OAuth 类型没有 apikey 容器，需要独立的模型映射区域) -->
+      <!-- OAuth/SetupToken Model Mapping (这些类型没有 apikey 容器，需要独立的模型映射区域) -->
       <div
-        v-if="account.platform === 'openai' && account.type === 'oauth'"
+        v-if="showStandaloneModelRestriction"
         class="border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <label class="input-label">{{ t('admin.accounts.modelRestriction') }}</label>
@@ -1887,6 +1887,11 @@ const openAIWSModeConcurrencyHintKey = computed(() =>
 const isOpenAIModelRestrictionDisabled = computed(() =>
   props.account?.platform === 'openai' && openaiPassthroughEnabled.value
 )
+const showStandaloneModelRestriction = computed(() =>
+  (props.account?.platform === 'openai' && props.account?.type === 'oauth') ||
+  (props.account?.platform === 'anthropic' &&
+    (props.account?.type === 'oauth' || props.account?.type === 'setup-token'))
+)
 
 // Computed: current preset mappings based on platform
 const presetMappings = computed(() => getPresetMappingsByPlatform(props.account?.platform || 'anthropic'))
@@ -2213,8 +2218,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
           : 'https://api.anthropic.com'
     editBaseUrl.value = platformDefaultUrl
 
-    // Load model mappings for OpenAI OAuth accounts
-    if (newAccount.platform === 'openai' && newAccount.credentials) {
+    // Load model mappings for OAuth/SetupToken accounts with standalone model restriction UI
+    if (showStandaloneModelRestriction.value && newAccount.credentials) {
       const oauthCredentials = newAccount.credentials as Record<string, unknown>
       const existingMappings = oauthCredentials.model_mapping as Record<string, string> | undefined
       if (existingMappings && typeof existingMappings === 'object') {
@@ -2817,12 +2822,13 @@ const handleSubmit = async () => {
       updatePayload.credentials = newCredentials
     }
 
-    // OpenAI OAuth: persist model mapping to credentials
-    if (props.account.platform === 'openai' && props.account.type === 'oauth') {
+    // OAuth/SetupToken: persist model mapping to credentials
+    if (showStandaloneModelRestriction.value) {
       const currentCredentials = (updatePayload.credentials as Record<string, unknown>) ||
         ((props.account.credentials as Record<string, unknown>) || {})
       const newCredentials: Record<string, unknown> = { ...currentCredentials }
-      const shouldApplyModelMapping = !openaiPassthroughEnabled.value
+      const shouldApplyModelMapping =
+        !(props.account.platform === 'openai' && openaiPassthroughEnabled.value)
 
       if (shouldApplyModelMapping) {
         const modelMapping = buildModelMappingObject(modelRestrictionMode.value, allowedModels.value, modelMappings.value)
