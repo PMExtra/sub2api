@@ -1,0 +1,106 @@
+name: Release Latest Docker Image
+
+on:
+  push:
+    branches:
+      - release
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: release-latest-docker
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Build and publish latest image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set image name
+        id: image
+        run: |
+          owner="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          repo="$(echo "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')"
+          echo "name=ghcr.io/${owner}/${repo}" >> "$GITHUB_OUTPUT"
+
+      - name: Set image version
+        id: version
+        run: |
+          version="$(tr -d '\r\n[:space:]' < backend/cmd/server/VERSION)"
+          version="${version#v}"
+          if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Invalid VERSION: $version" >&2
+            exit 1
+          fi
+          echo "version=${version}.pm" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: frontend
+
+      - name: Build frontend
+        run: pnpm run build
+        working-directory: frontend
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache-dependency-path: backend/go.sum
+
+      - name: Verify Go version
+        run: |
+          go version | grep -q 'go1.26.4'
+
+      - name: Build backend binary
+        run: |
+          date_value="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+            -tags embed \
+            -ldflags="-s -w -X main.Version=${{ steps.version.outputs.version }} -X main.Commit=${{ github.sha }} -X main.Date=${date_value} -X main.BuildType=release" \
+            -trimpath \
+            -o ../sub2api \
+            ./cmd/server
+        working-directory: backend
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push latest image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.goreleaser
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.image.outputs.name }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
