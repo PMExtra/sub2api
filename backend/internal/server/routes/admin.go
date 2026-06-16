@@ -121,6 +121,7 @@ func RegisterAdminRoutes(
 
 		// 风控中心
 		registerContentModerationRoutes(admin, h)
+		registerFullAuditRoutes(admin, h)
 
 		// 独立提示词输入审计
 		registerPromptAuditRoutes(admin, h)
@@ -178,6 +179,15 @@ func registerContentModerationRoutes(admin *gin.RouterGroup, h *handler.Handlers
 		risk.POST("/users/:user_id/unban", h.Admin.ContentModeration.UnbanUser)
 		risk.DELETE("/hashes", h.Admin.ContentModeration.DeleteFlaggedHash)
 		risk.DELETE("/hashes/all", h.Admin.ContentModeration.ClearFlaggedHashes)
+	}
+}
+
+func registerFullAuditRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	fullAudit := admin.Group("/full-audit")
+	{
+		fullAudit.GET("/config", h.Admin.FullAudit.GetConfig)
+		fullAudit.PUT("/config", h.Admin.FullAudit.UpdateConfig)
+		fullAudit.GET("/status", h.Admin.FullAudit.GetStatus)
 	}
 }
 

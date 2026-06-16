@@ -108,6 +108,11 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		return
 	}
 
+	if decision := h.checkFullAudit(c, reqLog, apiKey, subject, service.FullAuditProtocolOpenAIChat, reqModel, body); decision != nil && decision.Blocked {
+		h.chatCompletionsErrorResponse(c, fullAuditStatus(decision), fullAuditErrorCode(decision), decision.Message)
+		return
+	}
+
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIChat, reqModel, body); decision != nil && !decision.AllowNextStage {
 		h.openAISecurityAuditError(c, decision)
 		return

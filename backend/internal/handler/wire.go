@@ -43,6 +43,7 @@ func ProvideAdminHandlers(
 	channelMonitorTemplateHandler *admin.ChannelMonitorRequestTemplateHandler,
 	contentModerationHandler *admin.ContentModerationHandler,
 	promptAuditHandler *securityaudit.PromptAdminHandler,
+	fullAuditHandler *admin.FullAuditHandler,
 	paymentHandler *admin.PaymentHandler,
 	affiliateHandler *admin.AffiliateHandler,
 	complianceHandler *admin.ComplianceHandler,
@@ -87,6 +88,7 @@ func ProvideAdminHandlers(
 		ChannelMonitorTemplate: channelMonitorTemplateHandler,
 		ContentModeration:      contentModerationHandler,
 		PromptAudit:            promptAuditHandler,
+		FullAudit:              fullAuditHandler,
 		Payment:                paymentHandler,
 		Affiliate:              affiliateHandler,
 		Compliance:             complianceHandler,
@@ -110,11 +112,12 @@ func ProvideGatewayHandler(
 	userMsgQueueService *service.UserMessageQueueService,
 	cfg *config.Config,
 	settingService *service.SettingService,
+	fullAuditService *service.FullAuditService,
 	coordinator *securityaudit.Coordinator,
 ) *GatewayHandler {
 	h := NewGatewayHandler(gatewayService, openAIGatewayService, geminiCompatService, antigravityGatewayService,
 		userService, concurrencyService, billingCacheService, usageService, apiKeyService, usageRecordWorkerPool,
-		errorPassthroughService, contentModerationService, userMsgQueueService, cfg, settingService)
+		errorPassthroughService, contentModerationService, fullAuditService, userMsgQueueService, cfg, settingService)
 	h.securityAuditCoordinator = coordinator
 	return h
 }
@@ -131,11 +134,12 @@ func ProvideOpenAIGatewayHandler(
 	opsService *service.OpsService,
 	grokQuotaService *service.GrokQuotaService,
 	cfg *config.Config,
+	fullAuditService *service.FullAuditService,
 	coordinator *securityaudit.Coordinator,
 ) *OpenAIGatewayHandler {
 	gatewayService.SetPluginManager(pluginManager)
 	h := NewOpenAIGatewayHandler(gatewayService, concurrencyService, billingCacheService, apiKeyService,
-		usageRecordWorkerPool, errorPassthroughService, contentModerationService, opsService, cfg)
+		usageRecordWorkerPool, errorPassthroughService, contentModerationService, opsService, fullAuditService, cfg)
 	h.securityAuditCoordinator = coordinator
 	h.grokMediaEligibilityProber = grokQuotaService
 	return h
@@ -281,6 +285,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewChannelMonitorHandler,
 	admin.NewChannelMonitorRequestTemplateHandler,
 	admin.NewContentModerationHandler,
+	admin.NewFullAuditHandler,
 	admin.NewPaymentHandler,
 	admin.NewAffiliateHandler,
 	admin.NewComplianceHandler,
