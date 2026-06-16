@@ -104,6 +104,11 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 
+	if decision := h.checkFullAudit(c, reqLog, apiKey, subject, service.FullAuditProtocolOpenAIResponses, reqModel, body); decision != nil && decision.Blocked {
+		h.responsesErrorResponse(c, fullAuditStatus(decision), fullAuditErrorCode(decision), decision.Message)
+		return
+	}
+
 	if decision := h.checkContentModeration(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, reqModel, body); decision != nil && decision.Blocked {
 		h.responsesErrorResponse(c, contentModerationStatus(decision), contentModerationErrorCode(decision), decision.Message)
 		return
