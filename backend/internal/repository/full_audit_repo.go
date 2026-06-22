@@ -59,16 +59,23 @@ func (r *fullAuditRepository) CreateRequestLog(ctx context.Context, log *service
 	if log.GroupID != nil {
 		groupID = *log.GroupID
 	}
+	var clientIP any
+	if log.ClientIP != "" {
+		clientIP = log.ClientIP
+	}
 	err = r.db.QueryRowContext(ctx, `
 INSERT INTO audit_request_logs (
-    request_id, user_id, user_email, api_key_id, api_key_name, group_id, group_name,
-    endpoint, provider, model, protocol, body_hash, message_hashes, message_count
+    request_id, client_request_id, user_id, user_email, api_key_id, api_key_name, group_id, group_name,
+    endpoint, provider, model, protocol, client_ip, user_agent, session_id,
+    body_hash, message_hashes, message_count
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7,
-    $8, $9, $10, $11, $12, $13::jsonb, $14
+    $1, $2, $3, $4, $5, $6, $7, $8,
+    $9, $10, $11, $12, $13::inet, $14, $15,
+    $16, $17::jsonb, $18
 ) RETURNING id, created_at`,
-		log.RequestID, userID, log.UserEmail, apiKeyID, log.APIKeyName, groupID, log.GroupName,
-		log.Endpoint, log.Provider, log.Model, log.Protocol, log.BodyHash, string(messageHashes), log.MessageCount,
+		log.RequestID, log.ClientRequestID, userID, log.UserEmail, apiKeyID, log.APIKeyName, groupID, log.GroupName,
+		log.Endpoint, log.Provider, log.Model, log.Protocol, clientIP, log.UserAgent, log.SessionID,
+		log.BodyHash, string(messageHashes), log.MessageCount,
 	).Scan(&log.ID, &log.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("insert full audit request log: %w", err)

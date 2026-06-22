@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS audit_message_kv (
 CREATE TABLE IF NOT EXISTS audit_request_logs (
     id BIGSERIAL PRIMARY KEY,
     request_id VARCHAR(64) NOT NULL DEFAULT '',
+    client_request_id VARCHAR(64) NOT NULL DEFAULT '',
     user_id BIGINT,
     user_email VARCHAR(255) NOT NULL DEFAULT '',
     api_key_id BIGINT,
@@ -22,6 +23,9 @@ CREATE TABLE IF NOT EXISTS audit_request_logs (
     provider VARCHAR(64) NOT NULL DEFAULT '',
     model VARCHAR(255) NOT NULL DEFAULT '',
     protocol VARCHAR(64) NOT NULL DEFAULT '',
+    client_ip inet,
+    user_agent TEXT NOT NULL DEFAULT '',
+    session_id VARCHAR(512) NOT NULL DEFAULT '',
     body_hash VARCHAR(64) NOT NULL DEFAULT '',
     message_hashes JSONB NOT NULL DEFAULT '[]'::jsonb,
     message_count INTEGER NOT NULL DEFAULT 0,
@@ -34,6 +38,9 @@ CREATE INDEX IF NOT EXISTS idx_audit_request_logs_created_at
 CREATE INDEX IF NOT EXISTS idx_audit_request_logs_request_id
     ON audit_request_logs(request_id);
 
+CREATE INDEX IF NOT EXISTS idx_audit_request_logs_client_request_id
+    ON audit_request_logs(client_request_id);
+
 CREATE INDEX IF NOT EXISTS idx_audit_request_logs_user_created
     ON audit_request_logs(user_id, created_at DESC);
 
@@ -45,3 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_request_logs_group_created
 
 CREATE INDEX IF NOT EXISTS idx_audit_request_logs_endpoint_created
     ON audit_request_logs(endpoint, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_audit_request_logs_session_id_created
+    ON audit_request_logs(session_id, created_at DESC)
+    WHERE session_id <> '';

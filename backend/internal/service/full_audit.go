@@ -27,6 +27,7 @@ const (
 	defaultFullAuditQueueSize          = 32768
 	defaultFullAuditTaskTimeoutSeconds = 5
 	defaultFullAuditUnavailableMessage = "Audit service is unavailable, please retry later"
+	maxFullAuditSessionIDLength        = 512
 )
 
 type FullAuditRepository interface {
@@ -50,18 +51,22 @@ type UpdateFullAuditConfigInput struct {
 }
 
 type FullAuditCheckInput struct {
-	RequestID  string
-	UserID     int64
-	UserEmail  string
-	APIKeyID   int64
-	APIKeyName string
-	GroupID    *int64
-	GroupName  string
-	Endpoint   string
-	Provider   string
-	Model      string
-	Protocol   string
-	Body       []byte
+	RequestID       string
+	ClientRequestID string
+	UserID          int64
+	UserEmail       string
+	APIKeyID        int64
+	APIKeyName      string
+	GroupID         *int64
+	GroupName       string
+	Endpoint        string
+	Provider        string
+	Model           string
+	Protocol        string
+	ClientIP        string
+	UserAgent       string
+	SessionID       string
+	Body            []byte
 }
 
 type FullAuditDecision struct {
@@ -82,22 +87,26 @@ type FullAuditMessageRecord struct {
 }
 
 type FullAuditRequestLog struct {
-	ID            int64
-	RequestID     string
-	UserID        *int64
-	UserEmail     string
-	APIKeyID      *int64
-	APIKeyName    string
-	GroupID       *int64
-	GroupName     string
-	Endpoint      string
-	Provider      string
-	Model         string
-	Protocol      string
-	BodyHash      string
-	MessageHashes []string
-	MessageCount  int
-	CreatedAt     time.Time
+	ID              int64
+	RequestID       string
+	ClientRequestID string
+	UserID          *int64
+	UserEmail       string
+	APIKeyID        *int64
+	APIKeyName      string
+	GroupID         *int64
+	GroupName       string
+	Endpoint        string
+	Provider        string
+	Model           string
+	Protocol        string
+	ClientIP        string
+	UserAgent       string
+	SessionID       string
+	BodyHash        string
+	MessageHashes   []string
+	MessageCount    int
+	CreatedAt       time.Time
 }
 
 type FullAuditStatus struct {
@@ -318,20 +327,24 @@ func buildFullAuditTask(input FullAuditCheckInput, extracted []FullAuditExtracte
 		hashes = append(hashes, item.Hash)
 	}
 	log := FullAuditRequestLog{
-		RequestID:     strings.TrimSpace(input.RequestID),
-		UserID:        fullAuditInt64PtrIfPositive(input.UserID),
-		UserEmail:     strings.TrimSpace(input.UserEmail),
-		APIKeyID:      fullAuditInt64PtrIfPositive(input.APIKeyID),
-		APIKeyName:    strings.TrimSpace(input.APIKeyName),
-		GroupID:       input.GroupID,
-		GroupName:     strings.TrimSpace(input.GroupName),
-		Endpoint:      strings.TrimSpace(input.Endpoint),
-		Provider:      strings.TrimSpace(input.Provider),
-		Model:         strings.TrimSpace(input.Model),
-		Protocol:      strings.TrimSpace(input.Protocol),
-		BodyHash:      FullAuditBodyHash(input.Body),
-		MessageHashes: hashes,
-		MessageCount:  len(hashes),
+		RequestID:       strings.TrimSpace(input.RequestID),
+		ClientRequestID: strings.TrimSpace(input.ClientRequestID),
+		UserID:          fullAuditInt64PtrIfPositive(input.UserID),
+		UserEmail:       strings.TrimSpace(input.UserEmail),
+		APIKeyID:        fullAuditInt64PtrIfPositive(input.APIKeyID),
+		APIKeyName:      strings.TrimSpace(input.APIKeyName),
+		GroupID:         input.GroupID,
+		GroupName:       strings.TrimSpace(input.GroupName),
+		Endpoint:        strings.TrimSpace(input.Endpoint),
+		Provider:        strings.TrimSpace(input.Provider),
+		Model:           strings.TrimSpace(input.Model),
+		Protocol:        strings.TrimSpace(input.Protocol),
+		ClientIP:        strings.TrimSpace(input.ClientIP),
+		UserAgent:       strings.TrimSpace(input.UserAgent),
+		SessionID:       truncateFullAuditSessionID(input.SessionID),
+		BodyHash:        FullAuditBodyHash(input.Body),
+		MessageHashes:   hashes,
+		MessageCount:    len(hashes),
 	}
 	return fullAuditTask{Log: log, Messages: messages, QueuedAt: time.Now()}
 }
@@ -347,6 +360,14 @@ func fullAuditInt64PtrIfPositive(v int64) *int64 {
 	}
 	out := v
 	return &out
+}
+
+func truncateFullAuditSessionID(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= maxFullAuditSessionIDLength {
+		return value
+	}
+	return value[:maxFullAuditSessionIDLength]
 }
 
 func (s *FullAuditService) loadConfig(ctx context.Context) (*FullAuditConfig, error) {

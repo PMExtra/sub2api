@@ -46,32 +46,70 @@ func TestFullAuditRepositoryCreateRequestLog_InsertsSnapshotFields(t *testing.T)
 	insertSQL := regexp.QuoteMeta("INSERT INTO audit_request_logs (")
 	mock.ExpectQuery(insertSQL).
 		WithArgs(
-			"req_1", userID, "user@example.com", apiKeyID, "key", groupID, "group",
+			"req_1", "client_req_1", userID, "user@example.com", apiKeyID, "key", groupID, "group",
 			"/v1/chat/completions", "openai", "gpt-test", service.FullAuditProtocolOpenAIChat,
+			"203.0.113.10", "audit-client/1.0", "sess-1",
 			"body_hash", `["hash1","hash2"]`, 2,
 		).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(int64(1), time.Now()))
 
 	log := &service.FullAuditRequestLog{
-		RequestID:     "req_1",
-		UserID:        &userID,
-		UserEmail:     "user@example.com",
-		APIKeyID:      &apiKeyID,
-		APIKeyName:    "key",
-		GroupID:       &groupID,
-		GroupName:     "group",
-		Endpoint:      "/v1/chat/completions",
-		Provider:      "openai",
-		Model:         "gpt-test",
-		Protocol:      service.FullAuditProtocolOpenAIChat,
-		BodyHash:      "body_hash",
-		MessageHashes: []string{"hash1", "hash2"},
-		MessageCount:  2,
+		RequestID:       "req_1",
+		ClientRequestID: "client_req_1",
+		UserID:          &userID,
+		UserEmail:       "user@example.com",
+		APIKeyID:        &apiKeyID,
+		APIKeyName:      "key",
+		GroupID:         &groupID,
+		GroupName:       "group",
+		Endpoint:        "/v1/chat/completions",
+		Provider:        "openai",
+		Model:           "gpt-test",
+		Protocol:        service.FullAuditProtocolOpenAIChat,
+		ClientIP:        "203.0.113.10",
+		UserAgent:       "audit-client/1.0",
+		SessionID:       "sess-1",
+		BodyHash:        "body_hash",
+		MessageHashes:   []string{"hash1", "hash2"},
+		MessageCount:    2,
 	}
 
 	err = repo.CreateRequestLog(context.Background(), log)
 
 	require.NoError(t, err)
 	require.Equal(t, int64(1), log.ID)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestFullAuditRepositoryCreateRequestLog_EmptyClientIPWritesNull(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+
+	repo := NewFullAuditRepository(db)
+	insertSQL := regexp.QuoteMeta("INSERT INTO audit_request_logs (")
+	mock.ExpectQuery(insertSQL).
+		WithArgs(
+			"req_1", "", nil, "", nil, "", nil, "",
+			"/v1/responses", "openai", "gpt-test", service.FullAuditProtocolOpenAIResponses,
+			nil, "", "",
+			"body_hash", `[]`, 0,
+		).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(int64(1), time.Now()))
+
+	log := &service.FullAuditRequestLog{
+		RequestID:     "req_1",
+		Endpoint:      "/v1/responses",
+		Provider:      "openai",
+		Model:         "gpt-test",
+		Protocol:      service.FullAuditProtocolOpenAIResponses,
+		BodyHash:      "body_hash",
+		MessageHashes: []string{},
+		MessageCount:  0,
+	}
+
+	err = repo.CreateRequestLog(context.Background(), log)
+
+	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

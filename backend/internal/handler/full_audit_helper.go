@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
 
@@ -68,13 +70,17 @@ func runFullAudit(c *gin.Context, reqLog *zap.Logger, svc fullAuditChecker, apiK
 
 func buildFullAuditInput(c *gin.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, protocol string, model string, body []byte) service.FullAuditCheckInput {
 	input := service.FullAuditCheckInput{
-		RequestID: contentModerationRequestID(c.Request.Context()),
-		UserID:    subject.UserID,
-		Endpoint:  GetInboundEndpoint(c),
-		Provider:  contentModerationProvider(apiKey),
-		Model:     strings.TrimSpace(model),
-		Protocol:  protocol,
-		Body:      body,
+		RequestID:       contentModerationRequestID(c.Request.Context()),
+		ClientRequestID: fullAuditClientRequestID(c.Request.Context()),
+		UserID:          subject.UserID,
+		Endpoint:        GetInboundEndpoint(c),
+		Provider:        contentModerationProvider(apiKey),
+		Model:           strings.TrimSpace(model),
+		Protocol:        protocol,
+		ClientIP:        strings.TrimSpace(c.ClientIP()),
+		UserAgent:       strings.TrimSpace(c.GetHeader("User-Agent")),
+		SessionID:       extractFullAuditSessionID(c, body),
+		Body:            body,
 	}
 	if forcedPlatform, ok := middleware2.GetForcePlatformFromContext(c); ok {
 		input.Provider = strings.TrimSpace(forcedPlatform)
@@ -97,6 +103,40 @@ func buildFullAuditInput(c *gin.Context, apiKey *service.APIKey, subject middlew
 		input.Endpoint = c.Request.URL.Path
 	}
 	return input
+}
+
+func fullAuditClientRequestID(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	if clientRequestID, ok := ctx.Value(ctxkey.ClientRequestID).(string); ok {
+		return strings.TrimSpace(clientRequestID)
+	}
+	return ""
+}
+
+func extractFullAuditSessionID(c *gin.Context, body []byte) string {
+	if c != nil {
+		if value := strings.TrimSpace(c.GetHeader("session_id")); value != "" {
+			return value
+		}
+		if value := strings.TrimSpace(c.GetHeader("conversation_id")); value != "" {
+			return value
+		}
+		if value := strings.TrimSpace(c.GetHeader("X-Claude-Code-Session-Id")); value != "" {
+			return value
+		}
+	}
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return ""
+	}
+	if value := strings.TrimSpace(gjson.GetBytes(body, "prompt_cache_key").String()); value != "" {
+		return value
+	}
+	if parsed := service.ParseMetadataUserID(gjson.GetBytes(body, "metadata.user_id").String()); parsed != nil {
+		return strings.TrimSpace(parsed.SessionID)
+	}
+	return ""
 }
 
 func fullAuditStatus(decision *service.FullAuditDecision) int {
