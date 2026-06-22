@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -200,6 +201,23 @@ func TestFullAuditWorker_PersistsMessagesAndRequestLog(t *testing.T) {
 		return len(repo.messages) == 2 && len(repo.requestLogs) == 1
 	}, time.Second, 10*time.Millisecond)
 	require.Equal(t, uint64(1), svc.processed.Load())
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	log := repo.requestLogs[0]
+	require.Equal(t, "client_req_1", log.ClientRequestID)
+	require.Equal(t, "203.0.113.10", log.ClientIP)
+	require.Equal(t, "full-audit-test/1.0", log.UserAgent)
+	require.Equal(t, "sess-1", log.SessionID)
+}
+
+func TestBuildFullAuditTask_TruncatesSessionID(t *testing.T) {
+	input := fullAuditCheckInput()
+	input.SessionID = strings.Repeat("s", maxFullAuditSessionIDLength+20)
+
+	task := buildFullAuditTask(input, ExtractFullAuditUserMessages(input.Protocol, input.Body))
+
+	require.Len(t, task.Log.SessionID, maxFullAuditSessionIDLength)
+	require.Equal(t, strings.Repeat("s", maxFullAuditSessionIDLength), task.Log.SessionID)
 }
 
 func TestFullAuditWorker_KVFailureStillWritesRequestLog(t *testing.T) {
@@ -267,15 +285,19 @@ func newFullAuditTestService(t *testing.T, policy string, workers int, queueSize
 
 func fullAuditCheckInput() FullAuditCheckInput {
 	return FullAuditCheckInput{
-		RequestID:  "req_1",
-		UserID:     1001,
-		UserEmail:  "user@example.com",
-		APIKeyID:   2001,
-		APIKeyName: "key",
-		Endpoint:   "/v1/chat/completions",
-		Provider:   "openai",
-		Model:      "gpt-test",
-		Protocol:   FullAuditProtocolOpenAIChat,
+		RequestID:       "req_1",
+		ClientRequestID: "client_req_1",
+		UserID:          1001,
+		UserEmail:       "user@example.com",
+		APIKeyID:        2001,
+		APIKeyName:      "key",
+		Endpoint:        "/v1/chat/completions",
+		Provider:        "openai",
+		Model:           "gpt-test",
+		Protocol:        FullAuditProtocolOpenAIChat,
+		ClientIP:        "203.0.113.10",
+		UserAgent:       "full-audit-test/1.0",
+		SessionID:       "sess-1",
 		Body: []byte(`{
 			"model":"gpt-test",
 			"messages":[
