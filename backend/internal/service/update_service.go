@@ -15,11 +15,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"golang.org/x/mod/semver"
 )
 
 var (
@@ -639,31 +639,5 @@ func (s *UpdateService) saveToCache(ctx context.Context, info *UpdateInfo) {
 
 // compareVersions compares two semantic versions
 func compareVersions(current, latest string) int {
-	currentParts := parseVersion(current)
-	latestParts := parseVersion(latest)
-
-	for i := 0; i < 3; i++ {
-		if currentParts[i] < latestParts[i] {
-			return -1
-		}
-		if currentParts[i] > latestParts[i] {
-			return 1
-		}
-	}
-	return 0
-}
-
-func parseVersion(v string) [3]int {
-	v = strings.TrimPrefix(v, "v")
-	if idx := strings.IndexByte(v, '-'); idx != -1 {
-		v = v[:idx]
-	}
-	parts := strings.Split(v, ".")
-	result := [3]int{0, 0, 0}
-	for i := 0; i < len(parts) && i < 3; i++ {
-		if parsed, err := strconv.Atoi(parts[i]); err == nil {
-			result[i] = parsed
-		}
-	}
-	return result
+	return semver.Compare("v"+strings.TrimPrefix(current, "v"), "v"+strings.TrimPrefix(latest, "v"))
 }
