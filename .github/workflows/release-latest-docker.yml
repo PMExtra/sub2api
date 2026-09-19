@@ -38,7 +38,7 @@ jobs:
             echo "Invalid VERSION: $version" >&2
             exit 1
           fi
-          echo "version=${version}.pm" >> "$GITHUB_OUTPUT"
+          echo "version=${version}+pm" >> "$GITHUB_OUTPUT"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
