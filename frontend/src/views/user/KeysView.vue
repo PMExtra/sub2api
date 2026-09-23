@@ -2047,6 +2047,7 @@ const executeCcsImport = (row: ApiKey, clientType: CcSwitchClientType) => {
   const deeplink = buildCcSwitchImportDeeplink({
     baseUrl,
     platform,
+    codexConfigDefaultModel: row.group?.codex_config_default_model,
     clientType,
     providerName,
     apiKey: row.key,
