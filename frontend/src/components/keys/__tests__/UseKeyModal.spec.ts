@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import { getCodexDefaultModel } from '@/constants/codexConfig'
+import { getCodexDefaultModel, getCodexDefaultReviewModel } from '@/constants/codexConfig'
 
 const { copyToClipboardMock, saveAsMock } = vi.hoisted(() => ({
   copyToClipboardMock: vi.fn().mockResolvedValue(true),
@@ -827,7 +827,7 @@ describe('UseKeyModal', () => {
       .map((code) => code.text())
       .find((content) => content.includes('[model_providers.sub2api]'))
     expect(loadedUnixConfig).toContain('model = "claude-opus-4-8"')
-    expect(loadedUnixConfig).toContain(`review_model = "${getCodexDefaultModel('composite')}"`)
+    expect(loadedUnixConfig).toContain(`review_model = "${getCodexDefaultReviewModel('composite')}"`)
     expect(loadedUnixConfig?.split('\n')).not.toContain(`model = "${getCodexDefaultModel('composite')}"`)
 
     const downloadButton = wrapper.findAll('button').find((button) =>
@@ -935,7 +935,7 @@ describe('UseKeyModal', () => {
       .map((code) => code.text())
       .find((content) => content.includes('[model_providers.sub2api]'))
     expect(config?.split('\n')).toContain(`model = "${getCodexDefaultModel('composite')}"`)
-    expect(config).toContain(`review_model = "${getCodexDefaultModel('composite')}"`)
+    expect(config).toContain(`review_model = "${getCodexDefaultReviewModel('composite')}"`)
   })
 
   it('derives OpenAI Codex reasoning effort from the selected catalog descriptor', async () => {
@@ -1028,7 +1028,7 @@ describe('UseKeyModal', () => {
     config = grok.findAll('pre code').map((code) => code.text())
       .find((content) => content.includes('[model_providers.sub2api]'))
     expect(config).toContain('model = "custom-model\\"\\\\path"')
-    expect(config).toContain('# review_model = "custom-model\\"\\\\path"')
+    expect(config).toContain(`# review_model = "${getCodexDefaultReviewModel('grok')}"`)
 
     const composite = mount(UseKeyModal, mountOptions('composite'))
     const compositeCodexTab = composite.findAll('button').find((button) =>
@@ -1039,7 +1039,7 @@ describe('UseKeyModal', () => {
     config = composite.findAll('pre code').map((code) => code.text())
       .find((content) => content.includes('[model_providers.sub2api]'))
     expect(config).toContain('model = "custom-model\\"\\\\path"')
-    expect(config).toContain('review_model = "custom-model\\"\\\\path"')
+    expect(config).toContain(`review_model = "${getCodexDefaultReviewModel('composite')}"`)
   })
 
   it.each([
@@ -1096,7 +1096,7 @@ describe('UseKeyModal', () => {
       expect(readConfig()).not.toMatch(/^review_model\s*=/m)
     } else {
       const reviewPrefix = platform === 'grok' ? '# ' : ''
-      expect(readConfig()).toContain(`\n${reviewPrefix}review_model = "custom-main"\n`)
+      expect(readConfig()).toContain(`\n${reviewPrefix}review_model = "${getCodexDefaultReviewModel(platform)}"\n`)
     }
     expect(wrapper.find('[data-testid="codex-config-review-model-missing"]').exists()).toBe(false)
 
@@ -1106,7 +1106,7 @@ describe('UseKeyModal', () => {
       expect(readConfig()).not.toMatch(/^review_model\s*=/m)
     } else {
       const reviewPrefix = platform === 'grok' ? '# ' : ''
-      expect(readConfig()).toContain(`\n${reviewPrefix}review_model = "${getCodexDefaultModel(platform)}"\n`)
+      expect(readConfig()).toContain(`\n${reviewPrefix}review_model = "${getCodexDefaultReviewModel(platform)}"\n`)
     }
     wrapper.unmount()
   })
@@ -1146,10 +1146,10 @@ describe('UseKeyModal', () => {
     expect(readConfig()).toMatch(/^review_model = "claude-haiku-4-5"$/m)
 
     await wrapper.setProps({ codexConfigReviewModel: '' })
-    expect(readConfig()).toMatch(/^review_model = "claude-opus-4-8"$/m)
+    expect(readConfig().split('\n')).toContain(`review_model = "${getCodexDefaultReviewModel('anthropic')}"`)
     await wrapper.setProps({ codexConfigDefaultModel: '' })
     expect(readConfig()).toMatch(/^model = "claude-haiku-4-5"$/m)
-    expect(readConfig().split('\n')).toContain(`review_model = "${getCodexDefaultModel('anthropic')}"`)
+    expect(readConfig().split('\n')).toContain(`review_model = "${getCodexDefaultReviewModel('anthropic')}"`)
     wrapper.unmount()
   })
 

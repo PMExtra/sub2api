@@ -1253,9 +1253,9 @@ export default {
       },
       codexConfig: {
         defaultModel: 'Codex 配置首选模型',
-        defaultModelHint: '用于“使用密钥”生成的 Codex 配置。留空使用平台默认值，不改变模型映射或请求限制。',
+        defaultModelHint: '用于在“使用密钥”界面展示的 Codex 配置示例中的 model，不改变模型映射或请求限制。',
         reviewModel: 'Codex 配置审查模型',
-        reviewModelHint: '用于生成 Codex 配置中的 review_model。OpenAI 分组留空时不生成该配置；其它平台留空时优先使用首选模型，否则使用平台默认值。'
+        reviewModelHint: '用于在“使用密钥”界面展示的 Codex 配置示例中的 review_model。'
       },
       openaiLive: {
         title: 'OpenAI Live',

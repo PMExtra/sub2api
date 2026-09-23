@@ -1,30 +1,24 @@
 import type { GroupPlatform } from '@/types'
 
 // Shared by the generated Codex config and the group editor placeholders.
-const defaultModels: Record<GroupPlatform, string> = {
-  openai: 'gpt-6-sol',
-  anthropic: 'claude-opus-5-5',
-  gemini: 'gemini-3.8-flash',
-  antigravity: 'claude-opus-5',
-  grok: 'grok-4.7',
-  kimi: 'kimi-k3',
-  zhipu: 'glm-5.3',
-  deepseek: 'deepseek-flash',
-  minimax: 'MiniMax-M3',
-  opencode_go: 'glm-5.3',
-  composite: 'gpt-6-sol'
+const defaultModels: Record<GroupPlatform, { model: string; reviewModel: string }> = {
+  openai: { model: 'gpt-6-sol', reviewModel: 'codex-auto-review' },
+  anthropic: { model: 'claude-opus-5-5', reviewModel: 'claude-opus-4-5-20251101' },
+  gemini: { model: 'gemini-3.8-flash', reviewModel: 'gemini-3.8-flash' },
+  antigravity: { model: 'claude-opus-4-6', reviewModel: 'gemini-3.8-flash' },
+  grok: { model: 'grok-4.7', reviewModel: 'grok-4.7' },
+  kimi: { model: 'kimi-k3', reviewModel: 'kimi-k3' },
+  zhipu: { model: 'glm-5.3', reviewModel: 'glm-5.3-flash' },
+  deepseek: { model: 'deepseek-flash', reviewModel: 'deepseek-flash' },
+  minimax: { model: 'MiniMax-M3', reviewModel: 'MiniMax-M3' },
+  opencode_go: { model: 'glm-5.3', reviewModel: 'glm-5.3-flash' },
+  composite: { model: 'gpt-6-sol', reviewModel: 'gpt-6-luna' }
 }
-
-export const CODEX_AUTO_REVIEW_MODEL = 'codex-auto-review'
 
 export function getCodexDefaultModel(platform: GroupPlatform): string {
-  return defaultModels[platform]
+  return defaultModels[platform].model
 }
 
-export function getCodexReviewModelPlaceholder(
-  platform: GroupPlatform,
-  configuredDefaultModel: string
-): string {
-  if (platform === 'openai') return CODEX_AUTO_REVIEW_MODEL
-  return configuredDefaultModel.trim() || getCodexDefaultModel(platform)
+export function getCodexDefaultReviewModel(platform: GroupPlatform): string {
+  return defaultModels[platform].reviewModel
 }
