@@ -1,6 +1,6 @@
 import type { GroupPlatform } from '@/types'
 
-// Shared by the generated Codex config and the group editor placeholders.
+// Shared by generated Codex configs, CC Switch imports, and group editor placeholders.
 const defaultModels: Record<GroupPlatform, { model: string; reviewModel: string }> = {
   openai: { model: 'gpt-6-sol', reviewModel: 'codex-auto-review' },
   anthropic: { model: 'claude-opus-5-5', reviewModel: 'claude-opus-4-5-20251101' },
