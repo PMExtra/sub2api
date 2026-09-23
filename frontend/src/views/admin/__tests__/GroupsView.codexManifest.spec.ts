@@ -4,7 +4,7 @@ import { createPinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AdminGroup, CodexModelsManifestConfig } from "@/types";
-import { CODEX_AUTO_REVIEW_MODEL, getCodexDefaultModel } from "@/constants/codexConfig";
+import { getCodexDefaultModel, getCodexDefaultReviewModel } from "@/constants/codexConfig";
 import GroupsView from "@/views/admin/GroupsView.vue";
 
 const {
@@ -278,11 +278,11 @@ describe("GroupsView Codex manifest binding", () => {
 
     await wrapper.get('[data-tour="groups-create-btn"]').trigger("click");
     expect(mainInput().attributes("placeholder")).toBe(getCodexDefaultModel("anthropic"));
-    expect(reviewInput().attributes("placeholder")).toBe(getCodexDefaultModel("anthropic"));
+    expect(reviewInput().attributes("placeholder")).toBe(getCodexDefaultReviewModel("anthropic"));
     for (const [platform, expectedMain, expectedReview] of [
-      ["openai", getCodexDefaultModel("openai"), CODEX_AUTO_REVIEW_MODEL],
-      ["gemini", getCodexDefaultModel("gemini"), getCodexDefaultModel("gemini")],
-      ["anthropic", getCodexDefaultModel("anthropic"), getCodexDefaultModel("anthropic")],
+      ["openai", getCodexDefaultModel("openai"), getCodexDefaultReviewModel("openai")],
+      ["gemini", getCodexDefaultModel("gemini"), getCodexDefaultReviewModel("gemini")],
+      ["anthropic", getCodexDefaultModel("anthropic"), getCodexDefaultReviewModel("anthropic")],
     ]) {
       wrapper.getComponent('[data-tour="group-form-platform"]').vm.$emit("update:modelValue", platform);
       await flushPromises();
@@ -291,7 +291,7 @@ describe("GroupsView Codex manifest binding", () => {
     }
     await wrapper.get('[data-tour="group-form-name"]').setValue("new group");
     await mainInput().setValue("claude-opus-4-8");
-    expect(reviewInput().attributes("placeholder")).toBe("claude-opus-4-8");
+    expect(reviewInput().attributes("placeholder")).toBe(getCodexDefaultReviewModel("anthropic"));
     await reviewInput().setValue("claude-haiku-4-5");
     await wrapper.get("#create-group-form").trigger("submit");
     await flushPromises();
@@ -302,7 +302,7 @@ describe("GroupsView Codex manifest binding", () => {
     await wrapper.get('[data-tour="groups-create-btn"]').trigger("click");
     expect((mainInput().element as HTMLInputElement).value).toBe("");
     expect((reviewInput().element as HTMLInputElement).value).toBe("");
-    expect(reviewInput().attributes("placeholder")).toBe(getCodexDefaultModel("anthropic"));
+    expect(reviewInput().attributes("placeholder")).toBe(getCodexDefaultReviewModel("anthropic"));
     await wrapper.findAll("button").find((button) => button.text() === "common.cancel")!.trigger("click");
 
     await wrapper.findAll("button").find((button) => button.text().includes("common.edit"))!.trigger("click");
@@ -310,11 +310,11 @@ describe("GroupsView Codex manifest binding", () => {
     expect((mainInput().element as HTMLInputElement).value).toBe("existing-main");
     expect((reviewInput().element as HTMLInputElement).value).toBe("existing-review");
     expect(mainInput().attributes("placeholder")).toBe(getCodexDefaultModel("openai"));
-    expect(reviewInput().attributes("placeholder")).toBe(CODEX_AUTO_REVIEW_MODEL);
+    expect(reviewInput().attributes("placeholder")).toBe(getCodexDefaultReviewModel("openai"));
     await mainInput().setValue(" custom-model ");
-    expect(reviewInput().attributes("placeholder")).toBe(CODEX_AUTO_REVIEW_MODEL);
+    expect(reviewInput().attributes("placeholder")).toBe(getCodexDefaultReviewModel("openai"));
     await mainInput().setValue("");
-    expect(reviewInput().attributes("placeholder")).toBe(CODEX_AUTO_REVIEW_MODEL);
+    expect(reviewInput().attributes("placeholder")).toBe(getCodexDefaultReviewModel("openai"));
     await reviewInput().setValue(" custom-review ");
     await wrapper.get("#edit-group-form").trigger("submit");
     await flushPromises();

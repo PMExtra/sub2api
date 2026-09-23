@@ -277,7 +277,7 @@ import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { fetchCodexModelsManifest } from '@/api/codex'
 import type { GroupPlatform } from '@/types'
-import { getCodexDefaultModel } from '@/constants/codexConfig'
+import { getCodexDefaultModel, getCodexDefaultReviewModel } from '@/constants/codexConfig'
 import {
   findCodexCatalogModel,
   formatCodexReasoningEffortTomlLine,
@@ -701,8 +701,8 @@ function selectConfiguredCodexModel(platformDefault: string): string {
   return configured || selectCodexCatalogModel(platformDefault)
 }
 
-function selectConfiguredCodexReviewModel(platformDefault: string): string {
-  return props.codexConfigReviewModel?.trim() || props.codexConfigDefaultModel?.trim() || platformDefault
+function selectConfiguredCodexReviewModel(platform: GroupPlatform): string {
+  return props.codexConfigReviewModel?.trim() || getCodexDefaultReviewModel(platform)
 }
 
 function configuredOpenAIReviewModelTomlLine(): string {
@@ -1218,7 +1218,7 @@ function generateGrokCodexFiles(baseUrl: string, apiKey: string): FileConfig[] {
   const isWindowsPath = shell === 'windows' || shell === 'cmd' || shell === 'powershell'
   const configDir = isWindowsPath ? '%userprofile%\\.codex' : '~/.codex'
   const model = selectConfiguredCodexModel(getCodexDefaultModel('grok'))
-  const reviewModel = selectConfiguredCodexReviewModel(getCodexDefaultModel('grok'))
+  const reviewModel = selectConfiguredCodexReviewModel('grok')
 
   let envPath: string
   let envContent: string
@@ -1290,7 +1290,7 @@ function generateRoutedCodexFiles(
   const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
   const preferredModel = getCodexDefaultModel(platform)
   const model = selectConfiguredCodexModel(preferredModel)
-  const reviewModel = selectConfiguredCodexReviewModel(preferredModel)
+  const reviewModel = selectConfiguredCodexReviewModel(platform)
   const labels: Record<GroupPlatform, string> = {
     anthropic: 'Anthropic',
     openai: 'OpenAI',

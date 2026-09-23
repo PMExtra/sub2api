@@ -540,7 +540,7 @@
             name="codex_config_review_model"
             type="text"
             class="input"
-            :placeholder="getCodexReviewModelPlaceholder(createForm.platform, createForm.codex_config_default_model)"
+            :placeholder="getCodexDefaultReviewModel(createForm.platform)"
             maxlength="200"
           />
           <p class="input-hint">{{ t("admin.groups.codexConfig.reviewModelHint") }}</p>
@@ -2201,7 +2201,7 @@
             name="codex_config_review_model"
             type="text"
             class="input"
-            :placeholder="getCodexReviewModelPlaceholder(editForm.platform, editForm.codex_config_default_model)"
+            :placeholder="getCodexDefaultReviewModel(editForm.platform)"
             maxlength="200"
           />
           <p class="input-hint">{{ t("admin.groups.codexConfig.reviewModelHint") }}</p>
@@ -4313,7 +4313,7 @@
 </template>
 
 <script setup lang="ts">
-import { getCodexDefaultModel, getCodexReviewModelPlaceholder } from '@/constants/codexConfig';
+import { getCodexDefaultModel, getCodexDefaultReviewModel } from '@/constants/codexConfig';
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
