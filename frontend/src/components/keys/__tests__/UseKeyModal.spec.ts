@@ -976,21 +976,9 @@ describe('UseKeyModal', () => {
     expect(config).toContain(`review_model = "${getCodexDefaultReviewModel('composite')}"`)
   })
 
-  it('derives OpenAI Codex reasoning effort from the selected catalog descriptor', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        models: [
-          {
-            slug: 'glm-5.3',
-            default_reasoning_level: 'none',
-            supported_reasoning_levels: [{ effort: 'none' }]
-          }
-        ]
-      })
-    }))
-
+  it('omits the Codex catalog for OpenAI in both transport modes and on both platforms', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
     const wrapper = mount(UseKeyModal, {
       props: {
         show: true,
@@ -1010,14 +998,19 @@ describe('UseKeyModal', () => {
       }
     })
 
-    await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
-    await flushPromises()
-
-    const configToml = wrapper.findAll('pre code')
-      .map((code) => code.text())
-      .find((content) => content.includes('model_provider = "OpenAI"'))
-    expect(configToml).toContain('model = "glm-5.3"')
-    expect(configToml).not.toContain('model_reasoning_effort')
+    for (const transport of ['keys.useKeyModal.cliTabs.codexCli', 'keys.useKeyModal.cliTabs.codexCliWs']) {
+      await wrapper.findAll('button').find((button) => button.text().trim() === transport)!.trigger('click')
+      for (const os of ['macOS / Linux', 'Windows']) {
+        await wrapper.findAll('button').find((button) => button.text().trim() === os)!.trigger('click')
+        const configToml = wrapper.findAll('pre code')
+          .map((code) => code.text())
+          .find((content) => content.includes('model_provider = "OpenAI"'))
+        expect(configToml).toContain(`model = "${getCodexDefaultModel('openai')}"`)
+        expect(configToml).not.toContain('model_catalog_json')
+        expect(wrapper.find('[data-testid="codex-model-catalog"]').exists()).toBe(false)
+      }
+    }
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('uses the group-configured model across Codex config branches', async () => {
@@ -1116,17 +1109,19 @@ describe('UseKeyModal', () => {
     // Explicit review models must be active even in the Grok config.
     expect(readConfig()).toContain('\nreview_model = "custom-review\\"\\\\path"\n')
     expect(wrapper.find('[data-testid="codex-config-review-model-missing"]').exists()).toBe(false)
-    await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
-    await flushPromises()
+    if (platform !== 'openai') {
+      await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
+      await flushPromises()
+    }
     expect(readConfig()).toContain('\nreview_model = "custom-review\\"\\\\path"\n')
-    expect(wrapper.find('[data-testid="codex-config-review-model-missing"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="codex-config-review-model-missing"]').exists()).toBe(platform !== 'openai')
 
     await wrapper.setProps({ codexConfigReviewModel: 'catalog-first' })
     expect(readConfig()).toMatch(/^review_model = "catalog-first"$/m)
     expect(wrapper.find('[data-testid="codex-config-review-model-missing"]').exists()).toBe(false)
 
     await wrapper.setProps({ codexConfigDefaultModel: ' ', codexConfigReviewModel: 'review-only' })
-    expect(readConfig()).toMatch(/^model = "catalog-first"$/m)
+    expect(readConfig()).toMatch(new RegExp(`^model = "${platform === 'openai' ? getCodexDefaultModel('openai') : 'catalog-first'}"$`, 'm'))
     expect(readConfig()).toMatch(/^review_model = "review-only"$/m)
 
     await wrapper.setProps({ codexConfigDefaultModel: 'custom-main', codexConfigReviewModel: ' ' })
@@ -1139,7 +1134,7 @@ describe('UseKeyModal', () => {
     expect(wrapper.find('[data-testid="codex-config-review-model-missing"]').exists()).toBe(false)
 
     await wrapper.setProps({ codexConfigDefaultModel: '' })
-    expect(readConfig()).toMatch(/^model = "catalog-first"$/m)
+    expect(readConfig()).toMatch(new RegExp(`^model = "${platform === 'openai' ? getCodexDefaultModel('openai') : 'catalog-first'}"$`, 'm'))
     if (platform === 'openai') {
       expect(readConfig()).not.toMatch(/^review_model\s*=/m)
     } else {
@@ -1191,12 +1186,9 @@ describe('UseKeyModal', () => {
     wrapper.unmount()
   })
 
-  it('keeps an explicit model and warns when the loaded catalog does not contain it', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ models: [{ slug: 'gpt-5.5' }] })
-    }))
+  it('keeps an explicit OpenAI model without fetching a catalog or showing a warning', () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
 
     const wrapper = mount(UseKeyModal, {
       props: {
@@ -1218,13 +1210,12 @@ describe('UseKeyModal', () => {
       }
     })
 
-    await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
-    await flushPromises()
-
     const configToml = wrapper.findAll('pre code').map((code) => code.text())
       .find((content) => content.includes('model_provider = "OpenAI"'))
     expect(configToml).toContain('model = "custom-model"')
     expect(configToml).not.toContain('review_model')
-    expect(wrapper.find('[data-testid="codex-config-model-missing"]').exists()).toBe(true)
+    expect(configToml).not.toContain('model_catalog_json')
+    expect(wrapper.find('[data-testid="codex-config-model-missing"]').exists()).toBe(false)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
