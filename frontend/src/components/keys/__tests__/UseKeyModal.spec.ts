@@ -1011,7 +1011,7 @@ describe('UseKeyModal', () => {
         const configToml = wrapper.findAll('pre code')
           .map((code) => code.text())
           .find((content) => content.includes('model_provider = "OpenAI"'))
-        expect(configToml).toContain('model = "gpt-5.5"')
+        expect(configToml).toContain(`model = "${getCodexDefaultModel('openai')}"`)
         expect(configToml).not.toContain('model_catalog_json')
         expect(wrapper.find('[data-testid="codex-model-catalog"]').exists()).toBe(false)
       }
@@ -1115,17 +1115,22 @@ describe('UseKeyModal', () => {
     // Explicit review models must be active even in the Grok config.
     expect(readConfig()).toContain('\nreview_model = "custom-review\\"\\\\path"\n')
     expect(wrapper.find('[data-testid="codex-config-review-model-missing"]').exists()).toBe(false)
-    await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
-    await flushPromises()
-    expect(readConfig()).toContain('\nreview_model = "custom-review\\"\\\\path"\n')
-    expect(wrapper.find('[data-testid="codex-config-review-model-missing"]').exists()).toBe(true)
+    if (platform === 'openai') {
+      expect(wrapper.find('[data-testid="codex-model-catalog-fetch"]').exists()).toBe(false)
+    } else {
+      await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
+      await flushPromises()
+      expect(readConfig()).toContain('\nreview_model = "custom-review\\"\\\\path"\n')
+      expect(wrapper.find('[data-testid="codex-config-review-model-missing"]').exists()).toBe(true)
+    }
+    const fallbackModel = platform === 'openai' ? getCodexDefaultModel('openai') : 'catalog-first'
 
     await wrapper.setProps({ codexConfigReviewModel: 'catalog-first' })
     expect(readConfig()).toMatch(/^review_model = "catalog-first"$/m)
     expect(wrapper.find('[data-testid="codex-config-review-model-missing"]').exists()).toBe(false)
 
     await wrapper.setProps({ codexConfigDefaultModel: ' ', codexConfigReviewModel: 'review-only' })
-    expect(readConfig()).toMatch(/^model = "catalog-first"$/m)
+    expect(readConfig().split('\n')).toContain(`model = "${fallbackModel}"`)
     expect(readConfig()).toMatch(/^review_model = "review-only"$/m)
 
     await wrapper.setProps({ codexConfigDefaultModel: 'custom-main', codexConfigReviewModel: ' ' })
@@ -1138,7 +1143,7 @@ describe('UseKeyModal', () => {
     expect(wrapper.find('[data-testid="codex-config-review-model-missing"]').exists()).toBe(false)
 
     await wrapper.setProps({ codexConfigDefaultModel: '' })
-    expect(readConfig()).toMatch(/^model = "catalog-first"$/m)
+    expect(readConfig().split('\n')).toContain(`model = "${fallbackModel}"`)
     if (platform === 'openai') {
       expect(readConfig()).not.toMatch(/^review_model\s*=/m)
     } else {
@@ -1200,9 +1205,9 @@ describe('UseKeyModal', () => {
     const wrapper = mount(UseKeyModal, {
       props: {
         show: true,
-        apiKey: 'sk-openai-configured',
+        apiKey: 'sk-composite-configured',
         baseUrl: 'https://example.com/v1',
-        platform: 'openai',
+        platform: 'composite',
         codexConfigDefaultModel: 'custom-model'
       },
       global: {
@@ -1217,13 +1222,16 @@ describe('UseKeyModal', () => {
       }
     })
 
+    await wrapper.findAll('button').find((button) =>
+      button.text().trim() === 'keys.useKeyModal.cliTabs.codexCli'
+    )!.trigger('click')
     await wrapper.get('[data-testid="codex-model-catalog-fetch"]').trigger('click')
     await flushPromises()
 
     const configToml = wrapper.findAll('pre code').map((code) => code.text())
-      .find((content) => content.includes('model_provider = "OpenAI"'))
+      .find((content) => content.includes('[model_providers.sub2api]'))
     expect(configToml).toContain('model = "custom-model"')
-    expect(configToml).not.toContain('review_model')
+    expect(configToml).toContain(`review_model = "${getCodexDefaultReviewModel('composite')}"`)
     expect(wrapper.find('[data-testid="codex-config-model-missing"]').exists()).toBe(true)
   })
 })
