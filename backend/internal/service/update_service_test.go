@@ -69,6 +69,28 @@ func TestUpdateServicePerformUpdateNoUpdateReturnsSentinel(t *testing.T) {
 	require.ErrorIs(t, err, ErrNoUpdateAvailable)
 }
 
+func TestCompareVersionsAcceptsOptionalVPrefix(t *testing.T) {
+	tests := []struct {
+		name    string
+		current string
+		latest  string
+		want    int
+	}{
+		{name: "neither prefixed", current: "0.1.9", latest: "0.1.10", want: -1},
+		{name: "current prefixed", current: "v0.1.10", latest: "0.1.9", want: 1},
+		{name: "latest prefixed", current: "0.1.9", latest: "v0.1.10", want: -1},
+		{name: "both prefixed", current: "v0.1.9", latest: "v0.1.10", want: -1},
+		{name: "same version", current: "v0.1.10", latest: "0.1.10", want: 0},
+		{name: "prerelease", current: "0.1.10-rc.1", latest: "v0.1.10", want: -1},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.want, compareVersions(test.current, test.latest))
+		})
+	}
+}
+
 func newRollbackTestService(current string, releases []*GitHubRelease) *UpdateService {
 	return NewUpdateService(
 		&updateServiceCacheStub{},
