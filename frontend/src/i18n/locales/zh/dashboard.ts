@@ -764,14 +764,14 @@ export default {
 
   // Redeem
   redeem: {
-    title: '兑换码',
-    description: '输入兑换码以充值余额或增加并发数',
+    title: '兑换',
+    description: '输入兑换码或优惠码领取权益',
     currentBalance: '当前余额',
     concurrency: '并发数',
     requests: '请求',
-    redeemCodeLabel: '兑换码',
-    redeemCodePlaceholder: '请输入兑换码',
-    redeemCodeHint: '兑换码区分大小写',
+    redeemCodeLabel: '兑换码 / 优惠码',
+    redeemCodePlaceholder: '请输入兑换码或优惠码',
+    redeemCodeHint: '兑换码区分大小写，优惠码不区分大小写',
     redeeming: '兑换中...',
     redeemButton: '兑换',
     redeemSuccess: '兑换成功！',
@@ -780,14 +780,15 @@ export default {
     concurrentRequests: '并发请求',
     newBalance: '新余额',
     newConcurrency: '新并发数',
-    aboutCodes: '关于兑换码',
-    codeRule1: '每个兑换码只能使用一次',
-    codeRule2: '兑换码可以增加余额、并发数或试用权限',
+    aboutCodes: '兑换说明',
+    codeRule1: '兑换码只能使用一次；同一优惠码每个账号只能领取一次，注册时已领取的不能重复领取',
+    codeRule2: '兑换码可以增加余额、并发数或试用权限，优惠码可领取余额奖励',
     codeRule3: '如有兑换问题，请联系客服',
     codeRule4: '余额和并发数即时更新',
     recentActivity: '最近活动',
     historyWillAppear: '您的兑换历史将显示在这里',
     balanceAddedRedeem: '余额充值（兑换）',
+    balanceAddedPromo: '余额奖励（优惠码）',
     balanceAddedAffiliate: '余额充值（返利转入）',
     balanceAddedAdmin: '余额充值（管理员）',
     balanceDeductedAdmin: '余额扣除（管理员）',
@@ -804,7 +805,7 @@ export default {
     historyLoadFailed: '加载兑换记录失败，请重试。',
     userRefreshFailed: '兑换成功，但账户信息刷新失败。',
     subscriptionRefreshFailed: '兑换成功，但订阅状态刷新失败。',
-    pleaseEnterCode: '请输入兑换码'
+    pleaseEnterCode: '请输入兑换码或优惠码'
   },
 
   // Profile

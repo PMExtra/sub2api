@@ -760,14 +760,14 @@ export default {
 
   // Redeem
   redeem: {
-    title: 'Redeem Code',
-    description: 'Enter your redeem code to add balance or increase concurrency',
+    title: 'Redeem',
+    description: 'Enter a redeem or promo code to claim rewards',
     currentBalance: 'Current Balance',
     concurrency: 'Concurrency',
     requests: 'requests',
-    redeemCodeLabel: 'Redeem Code',
-    redeemCodePlaceholder: 'Enter your redeem code',
-    redeemCodeHint: 'Redeem codes are case-sensitive',
+    redeemCodeLabel: 'Redeem / Promo Code',
+    redeemCodePlaceholder: 'Enter a redeem or promo code',
+    redeemCodeHint: 'Redeem codes are case-sensitive; promo codes are not',
     redeeming: 'Redeeming...',
     redeemButton: 'Redeem Code',
     redeemSuccess: 'Code Redeemed Successfully!',
@@ -776,14 +776,15 @@ export default {
     concurrentRequests: 'concurrent requests',
     newBalance: 'New Balance',
     newConcurrency: 'New Concurrency',
-    aboutCodes: 'About Redeem Codes',
-    codeRule1: 'Each code can only be used once',
-    codeRule2: 'Codes may add balance, increase concurrency, or grant trial access',
+    aboutCodes: 'About Code Redemption',
+    codeRule1: 'Redeem codes can be used once. Each account can claim each promo code once, including claims made during registration.',
+    codeRule2: 'Redeem codes may add balance, increase concurrency, or grant trial access. Promo codes add bonus balance.',
     codeRule3: 'Contact support if you have issues redeeming a code',
     codeRule4: 'Balance and concurrency updates are immediate',
     recentActivity: 'Recent Activity',
     historyWillAppear: 'Your redemption history will appear here',
     balanceAddedRedeem: 'Balance Added (Redeem)',
+    balanceAddedPromo: 'Bonus Balance (Promo Code)',
     balanceAddedAffiliate: 'Balance Added (Affiliate Transfer)',
     balanceAddedAdmin: 'Balance Added (Admin)',
     balanceDeductedAdmin: 'Balance Deducted (Admin)',
@@ -800,7 +801,7 @@ export default {
     historyLoadFailed: 'Failed to load activity. Please try again.',
     userRefreshFailed: 'Redeemed successfully, but failed to refresh account information.',
     subscriptionRefreshFailed: 'Redeemed successfully, but failed to refresh subscription status.',
-    pleaseEnterCode: 'Please enter a redeem code'
+    pleaseEnterCode: 'Please enter a redeem or promo code'
   },
 
   // Profile

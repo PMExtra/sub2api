@@ -452,7 +452,7 @@ export default {
     // Promo Codes
     promo: {
       title: 'Promo Code Management',
-      description: 'Create and manage registration promo codes',
+      description: 'Create and manage promo codes for registration and manual redemption',
       createCode: 'Create Promo Code',
       editCode: 'Edit Promo Code',
       deleteCode: 'Delete Promo Code',
@@ -494,7 +494,7 @@ export default {
       copied: 'Copied!',
       // Messages
       noCodesYet: 'No promo codes yet',
-      createFirstCode: 'Create your first promo code to offer registration bonuses.',
+      createFirstCode: 'Create your first promo code to offer bonus balance to users.',
       codeCreated: 'Promo code created successfully',
       codeUpdated: 'Promo code updated successfully',
       codeDeleted: 'Promo code deleted successfully',
