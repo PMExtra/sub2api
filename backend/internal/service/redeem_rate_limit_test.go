@@ -58,8 +58,8 @@ func TestPublicRedeemAllowsLastAttemptBeforeLimit(t *testing.T) {
 	require.Equal(t, redeemMaxFailedAttempts, cache.count)
 	require.Equal(t, 1, cache.getCalls)
 	require.Equal(t, 1, cache.incrementCalls)
-	require.Equal(t, 1, cache.acquireCalls)
-	require.Equal(t, 1, cache.releaseCalls)
+	require.Zero(t, cache.acquireCalls)
+	require.Zero(t, cache.releaseCalls)
 }
 
 func TestPublicRedeemCountsOnlyConfiguredDomainFailures(t *testing.T) {

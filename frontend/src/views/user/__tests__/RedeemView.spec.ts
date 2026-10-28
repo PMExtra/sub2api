@@ -84,6 +84,48 @@ describe('RedeemView refresh after redemption', () => {
     }
   )
 
+  it('shows promo rewards as balance and distinguishes history rows with the same ID', async () => {
+    redeem.mockResolvedValue({ type: 'promo', value: 5 })
+    getHistory.mockResolvedValue({ total: 2, items: [
+      { id: 1, code: 'PROMO', type: 'promo', value: 5, used_at: '2026-03-08T00:00:00Z' },
+      { id: 1, code: 'REDEEM-CODE', type: 'balance', value: 10, used_at: '2026-03-07T00:00:00Z' },
+    ] })
+    const wrapper = await submitCode()
+    expect(wrapper.text()).toContain('redeem.balanceAddedPromo')
+    expect(wrapper.text()).toContain('redeem.balanceAddedRedeem')
+    expect(wrapper.text()).toContain('redeem.added: $5.00')
+    expect(wrapper.text()).toContain('+$5.00')
+    // Only codes longer than the display width are truncated.
+    expect(wrapper.text()).not.toContain('PROMO...')
+    expect(wrapper.text()).toContain('REDEEM-C...')
+    expect(refreshUser).toHaveBeenCalledOnce()
+    expect(showSuccess).toHaveBeenCalledWith('redeem.codeRedeemSuccess')
+    wrapper.unmount()
+  })
+
+  it.each([
+    ['PROMO_CODE_ALREADY_USED', 'auth.promoCodeAlreadyUsed'],
+    ['PROMO_CODE_EXPIRED', 'auth.promoCodeExpired'],
+    ['PROMO_CODE_DISABLED', 'auth.promoCodeDisabled'],
+    ['PROMO_CODE_MAX_USED', 'auth.promoCodeMaxUsed'],
+  ])('shows the localized %s error and preserves the input', async (reason, key) => {
+    redeem.mockRejectedValue({ reason, message: 'Server error text' })
+    const wrapper = await submitCode()
+    expect(wrapper.text()).toContain(key)
+    expect((wrapper.get('input#code').element as HTMLInputElement).value).toBe(' REDEEM-CODE ')
+    expect(refreshUser).not.toHaveBeenCalled()
+    expect(showSuccess).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('shows the localized fallback instead of raw backend text for other errors', async () => {
+    redeem.mockRejectedValue({ reason: 'REDEEM_CODE_NOT_FOUND', message: 'redeem code not found' })
+    const wrapper = await submitCode()
+    expect(wrapper.text()).toContain('redeem.failedToRedeem')
+    expect(wrapper.text()).not.toContain('redeem code not found')
+    wrapper.unmount()
+  })
+
   it('pages on the server, changes size, and resets page and total after redeeming', async () => {
     getHistory.mockResolvedValue({ items: [], total: 101 })
     const wrapper = mount(RedeemView, {
