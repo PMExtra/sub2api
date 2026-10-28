@@ -397,7 +397,7 @@ func unsupportedRedeemTypeError(codeType string) error {
 
 // Redeem 使用兑换码
 func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (*RedeemCode, error) {
-	return s.redeem(ctx, userID, strings.TrimSpace(code), enforceRedeemRateLimit)
+	return s.redeem(ctx, userID, strings.TrimSpace(code), enforceRedeemRateLimit, true)
 }
 
 // redeemForPaymentFulfillment is restricted to trusted payment fulfillment.
@@ -405,7 +405,7 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 // redeem failure counter. All code validation and transactional updates remain
 // identical to the public redemption path.
 func (s *RedeemService) redeemForPaymentFulfillment(ctx context.Context, userID int64, code string) (*RedeemCode, error) {
-	return s.redeem(ContextSkipRedeemAffiliate(ctx), userID, code, bypassRedeemRateLimit)
+	return s.redeem(ContextSkipRedeemAffiliate(ctx), userID, code, bypassRedeemRateLimit, false)
 }
 
 // RedeemForAdminFulfillment is restricted to trusted admin fulfillment.
@@ -413,37 +413,51 @@ func (s *RedeemService) redeemForPaymentFulfillment(ctx context.Context, userID 
 // redeem failure counter. Unlike payment fulfillment, the normal redeem-level
 // affiliate rebate remains enabled.
 func (s *RedeemService) RedeemForAdminFulfillment(ctx context.Context, userID int64, code string) (*RedeemCode, error) {
-	return s.redeem(ctx, userID, code, bypassRedeemRateLimit)
+	return s.redeem(ctx, userID, code, bypassRedeemRateLimit, false)
 }
 
-func (s *RedeemService) redeem(ctx context.Context, userID int64, code string, rateLimitPolicy redeemRateLimitPolicy) (*RedeemCode, error) {
+// promoFallbackEnabled fails closed: unlike registration, a settings read error
+// must not expose promo rewards through the redeem page.
+func (s *RedeemService) promoFallbackEnabled(ctx context.Context) bool {
+	if s.promoService == nil || s.settingService == nil {
+		return false
+	}
+	value, err := s.settingService.settingRepo.GetValue(ctx, SettingKeyPromoCodeEnabled)
+	if errors.Is(err, ErrSettingNotFound) {
+		return true
+	}
+	return err == nil && value != "false"
+}
+
+// redeemPromo claims a shared promo code. It relies on the promo row lock rather
+// than the per-code redeem lock, which would reject concurrent claimants.
+func (s *RedeemService) redeemPromo(ctx context.Context, userID int64, code string) (*RedeemCode, error) {
+	usage, err := s.promoService.applyPromoCode(ctx, userID, code)
+	if err == nil {
+		return PromoUsageAsRedemption(usage), nil
+	}
+	if errors.Is(err, ErrPromoCodeNotFound) {
+		err = ErrRedeemCodeNotFound
+	}
+	if status := infraerrors.Code(err); status >= 400 && status < 500 {
+		s.incrementRedeemErrorCount(ctx, userID)
+	}
+	return nil, err
+}
+
+func (s *RedeemService) redeem(ctx context.Context, userID int64, code string, rateLimitPolicy redeemRateLimitPolicy, allowPromo bool) (*RedeemCode, error) {
 	if rateLimitPolicy == enforceRedeemRateLimit {
 		if err := s.checkRedeemRateLimit(ctx, userID); err != nil {
 			return nil, err
 		}
 	}
 
-	// 获取分布式锁，防止同一兑换码并发使用
-	if !s.acquireRedeemLock(ctx, code) {
-		return nil, ErrRedeemCodeLocked
-	}
-	defer s.releaseRedeemLock(ctx, code)
-
 	// 查找兑换码
 	redeemCode, err := s.redeemRepo.GetByCode(ctx, code)
 	if err != nil {
 		if errors.Is(err, ErrRedeemCodeNotFound) {
-			if rateLimitPolicy == enforceRedeemRateLimit && s.promoService != nil && s.settingService != nil && s.settingService.IsPromoCodeEnabled(ctx) {
-				usage, promoErr := s.promoService.applyPromoCode(ctx, userID, code)
-				if promoErr == nil && usage != nil {
-					return PromoUsageAsRedemption(usage), nil
-				}
-				if promoErr != nil && !errors.Is(promoErr, ErrPromoCodeNotFound) {
-					if errors.Is(promoErr, ErrPromoCodeExpired) || errors.Is(promoErr, ErrPromoCodeDisabled) || errors.Is(promoErr, ErrPromoCodeMaxUsed) || errors.Is(promoErr, ErrPromoCodeAlreadyUsed) || errors.Is(promoErr, ErrPromoCodeInvalid) {
-						s.incrementRedeemErrorCount(ctx, userID)
-					}
-					return nil, promoErr
-				}
+			if allowPromo && code != "" && s.promoFallbackEnabled(ctx) {
+				return s.redeemPromo(ctx, userID, code)
 			}
 			if rateLimitPolicy == enforceRedeemRateLimit {
 				s.incrementRedeemErrorCount(ctx, userID)
@@ -452,6 +466,13 @@ func (s *RedeemService) redeem(ctx context.Context, userID int64, code string, r
 		}
 		return nil, fmt.Errorf("get redeem code: %w", err)
 	}
+
+	// 获取分布式锁，防止同一兑换码并发使用。锁前读到的状态可能已过期，
+	// 但下方 Use 的条件更新（WHERE status = 'unused'）仍保证只会兑换一次。
+	if !s.acquireRedeemLock(ctx, code) {
+		return nil, ErrRedeemCodeLocked
+	}
+	defer s.releaseRedeemLock(ctx, code)
 
 	// 检查兑换码状态和码本身的过期时间
 	if redeemCode.IsExpired() {
@@ -709,8 +730,12 @@ func (s *RedeemService) GetUserHistory(ctx context.Context, userID int64, limit 
 		if limit <= 0 {
 			limit = 10
 		}
+		// The total is a window count on the page query, so this costs no extra round trip.
 		codes, _, err := s.historyRepo.ListByUser(ctx, userID, pagination.PaginationParams{Page: 1, PageSize: limit})
-		return codes, err
+		if err != nil {
+			return nil, fmt.Errorf("get user redeem history: %w", err)
+		}
+		return codes, nil
 	}
 	codes, err := s.redeemRepo.ListByUser(ctx, userID, limit)
 	if err != nil {
@@ -778,7 +803,11 @@ func (s *RedeemService) reduceOrCancelSubscription(ctx context.Context, userID, 
 // GetUserHistoryPaginated returns all redemption types for the authenticated user.
 func (s *RedeemService) GetUserHistoryPaginated(ctx context.Context, userID int64, params pagination.PaginationParams) ([]RedeemCode, *pagination.PaginationResult, error) {
 	if s.historyRepo != nil {
-		return s.historyRepo.ListByUser(ctx, userID, params)
+		codes, result, err := s.historyRepo.ListByUser(ctx, userID, params)
+		if err != nil {
+			return nil, nil, fmt.Errorf("get user redeem history: %w", err)
+		}
+		return codes, result, nil
 	}
 	return s.redeemRepo.ListByUserPaginated(ctx, userID, params, "")
 }

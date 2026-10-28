@@ -115,6 +115,14 @@ describe('RedeemView refresh after redemption', () => {
     wrapper.unmount()
   })
 
+  it('shows the localized fallback instead of raw backend text for other errors', async () => {
+    redeem.mockRejectedValue({ reason: 'REDEEM_CODE_NOT_FOUND', message: 'redeem code not found' })
+    const wrapper = await submitCode()
+    expect(wrapper.text()).toContain('redeem.failedToRedeem')
+    expect(wrapper.text()).not.toContain('redeem code not found')
+    wrapper.unmount()
+  })
+
   it('pages on the server, changes size, and resets page and total after redeeming', async () => {
     getHistory.mockResolvedValue({ items: [], total: 101 })
     const wrapper = mount(RedeemView, {

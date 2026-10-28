@@ -17,26 +17,19 @@ func NewUserRedemptionHistoryRepository(client *dbent.Client) service.UserRedemp
 }
 
 // ListByUser pages over both sources in SQL before hydrating the page. This
-// preserves global ordering without loading an entire user's history.
+// preserves global ordering without loading an entire user's history. The
+// total comes from the page query itself so it always matches the page.
 func (r *userRedemptionHistoryRepository) ListByUser(ctx context.Context, userID int64, params pagination.PaginationParams) ([]service.RedeemCode, *pagination.PaginationResult, error) {
 	client := clientFromContext(ctx, r.client)
-	redeemTotal, err := client.RedeemCode.Query().Where(redeemcode.UsedByEQ(userID)).Count(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	promoTotal, err := client.PromoCodeUsage.Query().Where(promocodeusage.UserIDEQ(userID)).Count(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	result := paginationResultFromTotal(int64(redeemTotal)+int64(promoTotal), params)
-
+	// The ordering matches redeemCodeRepository.ListByUser for redeem-only
+	// histories; source breaks ties between the two ID spaces.
 	rows, err := client.QueryContext(ctx, `
-SELECT id, source FROM (
+SELECT id, source, COUNT(*) OVER () FROM (
     SELECT id, 'redeem' AS source, used_at FROM redeem_codes WHERE used_by = $1
     UNION ALL
     SELECT id, 'promo' AS source, used_at FROM promo_code_usages WHERE user_id = $1
 ) AS history
-ORDER BY used_at DESC NULLS LAST, source ASC, id DESC
+ORDER BY used_at DESC, source ASC, id DESC
 LIMIT $2 OFFSET $3`, userID, params.Limit(), params.Offset())
 	if err != nil {
 		return nil, nil, err
@@ -47,9 +40,10 @@ LIMIT $2 OFFSET $3`, userID, params.Limit(), params.Offset())
 	}
 	var keys []historyKey
 	var redeemIDs, promoIDs []int64
+	var total int64
 	for rows.Next() {
 		var key historyKey
-		if err := rows.Scan(&key.id, &key.source); err != nil {
+		if err := rows.Scan(&key.id, &key.source, &total); err != nil {
 			rows.Close()
 			return nil, nil, err
 		}
@@ -65,6 +59,19 @@ LIMIT $2 OFFSET $3`, userID, params.Limit(), params.Offset())
 	if rowErr != nil {
 		return nil, nil, rowErr
 	}
+	// A page past the end has no rows to carry the window count.
+	if len(keys) == 0 && params.Offset() > 0 {
+		redeemTotal, err := client.RedeemCode.Query().Where(redeemcode.UsedByEQ(userID)).Count(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		promoTotal, err := client.PromoCodeUsage.Query().Where(promocodeusage.UserIDEQ(userID)).Count(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		total = int64(redeemTotal) + int64(promoTotal)
+	}
+	result := paginationResultFromTotal(total, params)
 
 	items := make(map[historyKey]service.RedeemCode, len(keys))
 	if len(redeemIDs) > 0 {

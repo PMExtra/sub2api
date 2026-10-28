@@ -525,7 +525,7 @@ const handleRedeem = async () => {
     const promoError = promoErrors[error.reason || error.response?.data?.reason]
     errorMessage.value = promoError
       ? t(promoError)
-      : error.message || error.response?.data?.detail || t('redeem.failedToRedeem')
+      : error.response?.data?.detail || t('redeem.failedToRedeem')
 
     appStore.showError(t('redeem.redeemFailed'))
   } finally {

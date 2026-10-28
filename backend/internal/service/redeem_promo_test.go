@@ -92,6 +92,9 @@ func TestRedeemPromoSharedClaimsAndLimits(t *testing.T) {
 	require.Zero(t, balances[4])
 	require.Equal(t, 3, repo.code.UsedCount)
 	require.Equal(t, 3, cache.incrementCalls)
+	// Shared promo claims are serialized by the promo row lock; the per-code
+	// redeem lock would reject concurrent claimants instead of queueing them.
+	require.Zero(t, cache.acquireCalls)
 }
 
 func TestRedeemCodeTakesPrecedenceOverPromo(t *testing.T) {
@@ -143,6 +146,9 @@ func TestRedeemPromoFailuresAndRateLimit(t *testing.T) {
 		{"disabled feature", func(s *RedeemService, _ *redemptionPromoRepo, _ *redeemRateLimitCacheStub) {
 			s.settingService = NewSettingService(&settingRepoStub{values: map[string]string{SettingKeyPromoCodeEnabled: "false"}}, nil)
 		}, ErrRedeemCodeNotFound, 1},
+		{"settings read failure", func(s *RedeemService, _ *redemptionPromoRepo, _ *redeemRateLimitCacheStub) {
+			s.settingService = NewSettingService(&settingRepoStub{err: errors.New("settings unavailable")}, nil)
+		}, ErrRedeemCodeNotFound, 1},
 		{"rate limited", func(_ *RedeemService, _ *redemptionPromoRepo, c *redeemRateLimitCacheStub) {
 			c.count = redeemMaxFailedAttempts
 		}, ErrRedeemRateLimited, 0},
@@ -161,7 +167,7 @@ func TestRedeemPromoFailuresAndRateLimit(t *testing.T) {
 			}
 			require.Equal(t, tt.wantCount, cache.incrementCalls)
 			require.Empty(t, balances)
-			if tt.name == "rate limited" || tt.name == "disabled feature" {
+			if tt.name == "rate limited" || tt.name == "disabled feature" || tt.name == "settings read failure" {
 				require.Zero(t, repo.lookups)
 			}
 		})
