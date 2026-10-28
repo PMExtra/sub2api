@@ -201,7 +201,7 @@ export default {
           discardCancel: '继续编辑',
         },
         promoCode: '优惠码',
-        promoCodeHint: '允许用户在注册时使用优惠码',
+        promoCodeHint: '允许用户在注册时使用优惠码，或在兑换页面手动领取',
         invitationCode: '邀请码注册',
         invitationCodeHint: '开启后，用户注册时需要填写有效的邀请码',
         passwordReset: '忘记密码',
