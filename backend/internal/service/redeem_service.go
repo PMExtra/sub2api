@@ -139,6 +139,11 @@ type RedeemCodeBatchUpdateResult struct {
 
 // RedeemService 兑换码服务
 type RedeemService struct {
+	// These dependencies are supplied by ProvideRedeemService for the public
+	// redemption entry point. Trusted fulfillment continues to accept redeem codes only.
+	promoService         *PromoService
+	settingService       *SettingService
+	historyRepo          UserRedemptionHistoryRepository
 	redeemRepo           RedeemCodeRepository
 	userRepo             UserRepository
 	redeemUserRepo       RedeemUserAdjustmentRepository
@@ -392,7 +397,7 @@ func unsupportedRedeemTypeError(codeType string) error {
 
 // Redeem 使用兑换码
 func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (*RedeemCode, error) {
-	return s.redeem(ctx, userID, code, enforceRedeemRateLimit)
+	return s.redeem(ctx, userID, strings.TrimSpace(code), enforceRedeemRateLimit)
 }
 
 // redeemForPaymentFulfillment is restricted to trusted payment fulfillment.
@@ -428,6 +433,18 @@ func (s *RedeemService) redeem(ctx context.Context, userID int64, code string, r
 	redeemCode, err := s.redeemRepo.GetByCode(ctx, code)
 	if err != nil {
 		if errors.Is(err, ErrRedeemCodeNotFound) {
+			if rateLimitPolicy == enforceRedeemRateLimit && s.promoService != nil && s.settingService != nil && s.settingService.IsPromoCodeEnabled(ctx) {
+				usage, promoErr := s.promoService.applyPromoCode(ctx, userID, code)
+				if promoErr == nil && usage != nil {
+					return PromoUsageAsRedemption(usage), nil
+				}
+				if promoErr != nil && !errors.Is(promoErr, ErrPromoCodeNotFound) {
+					if errors.Is(promoErr, ErrPromoCodeExpired) || errors.Is(promoErr, ErrPromoCodeDisabled) || errors.Is(promoErr, ErrPromoCodeMaxUsed) || errors.Is(promoErr, ErrPromoCodeAlreadyUsed) || errors.Is(promoErr, ErrPromoCodeInvalid) {
+						s.incrementRedeemErrorCount(ctx, userID)
+					}
+					return nil, promoErr
+				}
+			}
 			if rateLimitPolicy == enforceRedeemRateLimit {
 				s.incrementRedeemErrorCount(ctx, userID)
 			}
@@ -688,6 +705,13 @@ func (s *RedeemService) GetStats(ctx context.Context) (map[string]any, error) {
 
 // GetUserHistory 获取用户的兑换历史
 func (s *RedeemService) GetUserHistory(ctx context.Context, userID int64, limit int) ([]RedeemCode, error) {
+	if s.historyRepo != nil {
+		if limit <= 0 {
+			limit = 10
+		}
+		codes, _, err := s.historyRepo.ListByUser(ctx, userID, pagination.PaginationParams{Page: 1, PageSize: limit})
+		return codes, err
+	}
 	codes, err := s.redeemRepo.ListByUser(ctx, userID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("get user redeem history: %w", err)
@@ -753,5 +777,8 @@ func (s *RedeemService) reduceOrCancelSubscription(ctx context.Context, userID, 
 
 // GetUserHistoryPaginated returns all redemption types for the authenticated user.
 func (s *RedeemService) GetUserHistoryPaginated(ctx context.Context, userID int64, params pagination.PaginationParams) ([]RedeemCode, *pagination.PaginationResult, error) {
+	if s.historyRepo != nil {
+		return s.historyRepo.ListByUser(ctx, userID, params)
+	}
 	return s.redeemRepo.ListByUserPaginated(ctx, userID, params, "")
 }
