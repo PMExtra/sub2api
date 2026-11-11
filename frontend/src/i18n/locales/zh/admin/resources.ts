@@ -449,7 +449,7 @@ export default {
     // Promo Codes
     promo: {
       title: '优惠码管理',
-      description: '创建和管理注册优惠码',
+      description: '创建和管理优惠码，可在注册时使用或手动兑换',
       createCode: '创建优惠码',
       editCode: '编辑优惠码',
       deleteCode: '删除优惠码',
@@ -491,7 +491,7 @@ export default {
       copied: '已复制！',
       // 消息
       noCodesYet: '暂无优惠码',
-      createFirstCode: '创建您的第一个优惠码，为新用户提供注册奖励。',
+      createFirstCode: '创建您的第一个优惠码，为用户提供余额奖励。',
       codeCreated: '优惠码创建成功',
       codeUpdated: '优惠码更新成功',
       codeDeleted: '优惠码删除成功',

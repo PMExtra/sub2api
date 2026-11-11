@@ -98,7 +98,7 @@
                 <div class="mt-2 text-sm text-emerald-700 dark:text-emerald-400">
                   <p>{{ redeemResult.message }}</p>
                   <div class="mt-3 space-y-1">
-                    <p v-if="redeemResult.type === 'balance'" class="font-medium">
+                    <p v-if="isBalanceType(redeemResult.type)" class="font-medium">
                       {{ t('redeem.added') }}: ${{ redeemResult.value.toFixed(2) }}
                     </p>
                     <p v-else-if="redeemResult.type === 'concurrency'" class="font-medium">
@@ -229,7 +229,7 @@
           <div v-else-if="history.length > 0" class="space-y-3">
             <div
               v-for="item in history"
-              :key="item.id"
+              :key="`${item.type}:${item.id}`"
               class="flex items-center justify-between rounded-xl bg-gray-50 p-4 dark:bg-dark-800"
             >
               <div class="flex items-center gap-4">
@@ -307,7 +307,7 @@
                   v-if="!isAdminAdjustment(item.type)"
                   class="font-mono text-xs text-gray-400 dark:text-dark-500"
                 >
-                  {{ item.code.slice(0, 8) }}...
+                  {{ formatHistoryCode(item.code) }}
                 </p>
                 <p v-else class="text-xs text-gray-400 dark:text-dark-500">
                   {{ t('redeem.adminAdjustment') }}
@@ -408,7 +408,7 @@ const contactInfo = ref('')
 
 // Helper functions for history display
 const isBalanceType = (type: string) => {
-  return type === 'balance' || type === 'admin_balance'
+  return type === 'balance' || type === 'admin_balance' || type === 'promo'
 }
 
 const isSubscriptionType = (type: string) => {
@@ -419,8 +419,14 @@ const isAdminAdjustment = (type: string) => {
   return type === 'admin_balance' || type === 'admin_concurrency'
 }
 
+const formatHistoryCode = (code: string) => {
+  return code.length > 8 ? `${code.slice(0, 8)}...` : code
+}
+
 const getHistoryItemTitle = (item: RedeemHistoryItem) => {
-  if (item.type === 'balance') {
+  if (item.type === 'promo') {
+    return t('redeem.balanceAddedPromo')
+  } else if (item.type === 'balance') {
     return t('redeem.balanceAddedRedeem')
   } else if (item.type === 'admin_balance') {
     return item.value >= 0 ? t('redeem.balanceAddedAdmin') : t('redeem.balanceDeductedAdmin')
@@ -513,7 +519,17 @@ const handleRedeem = async () => {
     // Show success toast
     appStore.showSuccess(t('redeem.codeRedeemSuccess'))
   } catch (error: any) {
-    errorMessage.value = error.response?.data?.detail || t('redeem.failedToRedeem')
+    const promoErrors: Record<string, string> = {
+      PROMO_CODE_EXPIRED: 'auth.promoCodeExpired',
+      PROMO_CODE_DISABLED: 'auth.promoCodeDisabled',
+      PROMO_CODE_MAX_USED: 'auth.promoCodeMaxUsed',
+      PROMO_CODE_ALREADY_USED: 'auth.promoCodeAlreadyUsed',
+      PROMO_CODE_INVALID: 'auth.promoCodeInvalid'
+    }
+    const promoError = promoErrors[error.reason || error.response?.data?.reason]
+    errorMessage.value = promoError
+      ? t(promoError)
+      : error.response?.data?.detail || t('redeem.failedToRedeem')
 
     appStore.showError(t('redeem.redeemFailed'))
   } finally {
