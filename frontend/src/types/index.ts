@@ -1436,6 +1436,7 @@ export interface WindowStats {
   cost: number // Account cost (account multiplier)
   standard_cost?: number
   user_cost?: number
+  upstream_errors?: number | null // Today stats only; absent when ops monitoring is disabled
 }
 
 export interface UsageProgress {
@@ -2315,6 +2316,7 @@ export interface AccountUsageHistory {
   cost: number
   actual_cost: number // Account cost (account multiplier)
   user_cost: number // User/API key billed cost (group multiplier)
+  upstream_errors?: number | null // Absent when ops monitoring is disabled
 }
 
 export interface AccountUsageSummary {
@@ -2330,6 +2332,8 @@ export interface AccountUsageSummary {
   avg_daily_requests: number
   avg_daily_tokens: number
   avg_duration_ms: number
+  total_upstream_errors?: number | null // Absent when ops monitoring is disabled
+  today_upstream_errors?: number | null
   today: {
     date: string
     cost: number
