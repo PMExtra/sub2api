@@ -746,21 +746,23 @@ func (s *adminServiceImpl) validateCodexGroupRestriction(ctx context.Context, cu
 	if codexOnly && platform != PlatformOpenAI {
 		return fmt.Errorf("codex_only is only supported for OpenAI groups")
 	}
-	if platform != PlatformOpenAI || fallbackID == nil {
+	// The fallback is only used while codex_only is on; a stale value kept after
+	// turning it off must not block unrelated edits.
+	if !codexOnly || fallbackID == nil {
 		return nil
 	}
 	if *fallbackID <= 0 || *fallbackID == currentGroupID {
-		return fmt.Errorf("invalid Codex fallback group")
+		return fmt.Errorf("invalid codex fallback group")
 	}
 	group, err := s.groupRepo.GetByIDLite(ctx, *fallbackID)
 	if err != nil {
 		return fmt.Errorf("fallback group not found: %w", err)
 	}
 	if group.Platform != PlatformOpenAI || group.Status != StatusActive {
-		return fmt.Errorf("Codex fallback group must be an active OpenAI group")
+		return fmt.Errorf("codex fallback group must be an active OpenAI group")
 	}
 	if group.CodexOnly || group.ClaudeCodeOnly {
-		return fmt.Errorf("Codex fallback group cannot restrict official clients")
+		return fmt.Errorf("codex fallback group cannot restrict official clients")
 	}
 	return nil
 }
@@ -1001,8 +1003,14 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.FallbackGroupID != nil {
 		// 校验降级分组
 		if *input.FallbackGroupID > 0 {
-			if err := s.validateFallbackGroup(ctx, id, *input.FallbackGroupID); err != nil {
-				return nil, err
+			// 客户端限制均未开启时降级分组不生效；前端仍会回传隐藏的旧值，
+			// 未变更的旧值（可能已删除/停用）不应阻止保存其他字段。
+			fallbackInUse := group.ClaudeCodeOnly || group.CodexOnly
+			unchanged := group.FallbackGroupID != nil && *group.FallbackGroupID == *input.FallbackGroupID
+			if fallbackInUse || !unchanged {
+				if err := s.validateFallbackGroup(ctx, id, *input.FallbackGroupID); err != nil {
+					return nil, err
+				}
 			}
 			group.FallbackGroupID = input.FallbackGroupID
 		} else {

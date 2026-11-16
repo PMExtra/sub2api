@@ -234,3 +234,37 @@ func TestCodexGroupRoutingSelectionAndFailoverStayInTarget(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateCodexGroupRestrictionIgnoresStaleFallbackWhenDisabled(t *testing.T) {
+	stale := &Group{ID: 2, Platform: PlatformAnthropic, Status: StatusDisabled, ClaudeCodeOnly: true}
+	svc := &adminServiceImpl{groupRepo: codexRoutingGroupRepo{groups: map[int64]*Group{2: stale}}}
+	require.NoError(t, svc.validateCodexGroupRestriction(context.Background(), 1, PlatformOpenAI, false, &stale.ID))
+	require.Error(t, svc.validateCodexGroupRestriction(context.Background(), 1, PlatformOpenAI, true, &stale.ID))
+}
+
+type countingCodexRoutingGroupRepo struct {
+	codexRoutingGroupRepo
+	calls *int
+}
+
+func (r countingCodexRoutingGroupRepo) GetByIDLite(ctx context.Context, id int64) (*Group, error) {
+	*r.calls++
+	return r.codexRoutingGroupRepo.GetByIDLite(ctx, id)
+}
+
+func TestCodexGroupRoutingReusesResolvedFallbackGroup(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	parent := &Group{ID: 1, Platform: PlatformOpenAI, Status: StatusActive, Hydrated: true, CodexOnly: true}
+	target := &Group{ID: 2, Platform: PlatformOpenAI, Status: StatusActive, RequirePrivacySet: true, ProfitControlEnabled: true}
+	parent.FallbackGroupID = &target.ID
+	calls := 0
+	svc := &OpenAIGatewayService{schedulerSnapshot: &SchedulerSnapshotService{
+		groupRepo: countingCodexRoutingGroupRepo{codexRoutingGroupRepo{groups: map[int64]*Group{2: target}}, &calls},
+	}}
+	ctx, err := svc.WithCodexGroupRouting(codexRoutingContext(parent, false), parent, nil)
+	require.NoError(t, err)
+	require.Equal(t, 1, calls)
+	require.True(t, svc.loadOpenAIGroupRequiresPrivacySet(ctx, OpenAIRoutingGroupID(ctx, &parent.ID)))
+	svc.resolveOpenAIProfitControlGate(ctx, &parent.ID)
+	require.Equal(t, 1, calls, "fallback group must be reused from the routing context")
+}
