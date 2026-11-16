@@ -2610,6 +2610,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalPolicyDenied)
 			closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, routingErr.Error())
 		} else {
+			reqLog.Warn("openai.codex_fallback_group_unavailable", zap.Error(routingErr))
 			closeOpenAIClientWS(wsConn, coderws.StatusTryAgainLater, "Codex fallback group is unavailable")
 		}
 		return

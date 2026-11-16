@@ -2260,6 +2260,9 @@ func (s *OpenAIGatewayService) loadOpenAIGroupRequiresPrivacySet(ctx context.Con
 	if ctxGroup, ok := ctx.Value(ctxkey.Group).(*Group); ok && IsGroupContextValid(ctxGroup) && ctxGroup.ID == *groupID {
 		return ctxGroup.RequirePrivacySet
 	}
+	if routed := openAIResolvedFallbackGroup(ctx, *groupID); routed != nil {
+		return routed.RequirePrivacySet
+	}
 	if s.schedulerSnapshot == nil {
 		return false
 	}

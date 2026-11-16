@@ -37,6 +37,19 @@ func OpenAIRoutingGroup(ctx context.Context, group *Group) *Group {
 	return group
 }
 
+// openAIResolvedFallbackGroup returns the Codex fallback group already loaded
+// for this request when groupID refers to it, so downstream group lookups
+// (profit gate, privacy requirement) do not hit the repository again.
+func openAIResolvedFallbackGroup(ctx context.Context, groupID int64) *Group {
+	if ctx == nil {
+		return nil
+	}
+	if route, ok := ctx.Value(openAIGroupRoutingKey{}).(openAIGroupRouting); ok && route.group != nil && route.group.ID == groupID {
+		return route.group
+	}
+	return nil
+}
+
 // WithCodexGroupRouting resolves only group-level policy. Account-level client
 // restrictions remain unchanged and are checked by their existing forwarders.
 func (s *OpenAIGatewayService) WithCodexGroupRouting(c *gin.Context, group *Group, body []byte) (context.Context, error) {
@@ -50,12 +63,6 @@ func (s *OpenAIGatewayService) WithCodexGroupRouting(c *gin.Context, group *Grou
 	if result.Matched {
 		return ctx, nil
 	}
-	if group.FallbackGroupID == nil {
-		return ctx, ErrCodexOnly
-	}
-	if s == nil || s.schedulerSnapshot == nil {
-		return ctx, fmt.Errorf("resolve Codex fallback group: scheduler unavailable")
-	}
 	sourceID := group.ID
 	visited := map[int64]bool{sourceID: true}
 	for group.CodexOnly {
@@ -64,16 +71,19 @@ func (s *OpenAIGatewayService) WithCodexGroupRouting(c *gin.Context, group *Grou
 		}
 		id := *group.FallbackGroupID
 		if visited[id] {
-			return ctx, fmt.Errorf("Codex fallback group cycle detected")
+			return ctx, fmt.Errorf("codex fallback group cycle detected")
 		}
 		visited[id] = true
+		if s.schedulerSnapshot == nil {
+			return ctx, fmt.Errorf("resolve codex fallback group: scheduler unavailable")
+		}
 		var err error
 		group, err = s.schedulerSnapshot.GetGroupByIDLite(ctx, id)
 		if err != nil {
-			return ctx, fmt.Errorf("resolve Codex fallback group: %w", err)
+			return ctx, fmt.Errorf("resolve codex fallback group %d: %w", id, err)
 		}
 		if group == nil || group.Platform != PlatformOpenAI || group.Status != StatusActive {
-			return ctx, fmt.Errorf("Codex fallback group must be an active OpenAI group")
+			return ctx, fmt.Errorf("codex fallback group %d must be an active OpenAI group", id)
 		}
 	}
 	return context.WithValue(ctx, openAIGroupRoutingKey{}, openAIGroupRouting{sourceID: sourceID, group: group}), nil

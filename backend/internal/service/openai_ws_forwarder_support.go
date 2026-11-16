@@ -441,6 +441,9 @@ func getOpenAIGroupIDFromContext(c *gin.Context) int64 {
 	if !ok || apiKey == nil || apiKey.GroupID == nil {
 		return 0
 	}
+	if c.Request == nil {
+		return *apiKey.GroupID
+	}
 	return *OpenAIRoutingGroupID(c.Request.Context(), apiKey.GroupID)
 }
 

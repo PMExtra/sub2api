@@ -226,6 +226,8 @@ func (s *OpenAIGatewayService) resolveOpenAIProfitControlGate(ctx context.Contex
 	var group *Group
 	if ctxGroup, ok := ctx.Value(ctxkey.Group).(*Group); ok && IsGroupContextValid(ctxGroup) && ctxGroup.ID == *groupID {
 		group = ctxGroup
+	} else if routed := openAIResolvedFallbackGroup(ctx, *groupID); routed != nil {
+		group = routed
 	} else if s.schedulerSnapshot != nil {
 		// Lite 读取：门只用平台/倍率/利润/高峰字段，不需要账号计数聚合。
 		loaded, err := s.schedulerSnapshot.GetGroupByIDLite(ctx, *groupID)
