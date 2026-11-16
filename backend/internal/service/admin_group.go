@@ -510,6 +510,9 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		return nil, err
 	}
 
+	if err := s.validateCodexGroupRestriction(ctx, 0, platform, input.CodexOnly, input.FallbackGroupID); err != nil {
+		return nil, err
+	}
 	// 校验降级分组
 	if input.FallbackGroupID != nil {
 		if err := s.validateFallbackGroup(ctx, 0, *input.FallbackGroupID); err != nil {
@@ -619,6 +622,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		AudioTTSPricePerMillionChars:    audioTTSPricePerMillionChars,
 		AudioSTTPricePerHour:            audioSTTPricePerHour,
 		ClaudeCodeOnly:                  input.ClaudeCodeOnly,
+		CodexOnly:                       input.CodexOnly,
 		FallbackGroupID:                 input.FallbackGroupID,
 		FallbackGroupIDOnInvalidRequest: fallbackOnInvalidRequest,
 		ModelRouting:                    input.ModelRouting,
@@ -736,6 +740,29 @@ func (s *adminServiceImpl) validateFallbackGroup(ctx context.Context, currentGro
 		}
 		nextID = *fallbackGroup.FallbackGroupID
 	}
+}
+
+func (s *adminServiceImpl) validateCodexGroupRestriction(ctx context.Context, currentGroupID int64, platform string, codexOnly bool, fallbackID *int64) error {
+	if codexOnly && platform != PlatformOpenAI {
+		return fmt.Errorf("codex_only is only supported for OpenAI groups")
+	}
+	if platform != PlatformOpenAI || fallbackID == nil {
+		return nil
+	}
+	if *fallbackID <= 0 || *fallbackID == currentGroupID {
+		return fmt.Errorf("invalid Codex fallback group")
+	}
+	group, err := s.groupRepo.GetByIDLite(ctx, *fallbackID)
+	if err != nil {
+		return fmt.Errorf("fallback group not found: %w", err)
+	}
+	if group.Platform != PlatformOpenAI || group.Status != StatusActive {
+		return fmt.Errorf("Codex fallback group must be an active OpenAI group")
+	}
+	if group.CodexOnly || group.ClaudeCodeOnly {
+		return fmt.Errorf("Codex fallback group cannot restrict official clients")
+	}
+	return nil
 }
 
 // validateFallbackGroupOnInvalidRequest 校验无效请求兜底分组的有效性
@@ -964,6 +991,9 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		group.AudioSTTPricePerHour = normalizePrice(input.AudioSTTPricePerHour)
 	}
 
+	if input.CodexOnly != nil {
+		group.CodexOnly = *input.CodexOnly
+	}
 	// Claude Code 客户端限制
 	if input.ClaudeCodeOnly != nil {
 		group.ClaudeCodeOnly = *input.ClaudeCodeOnly
@@ -979,6 +1009,9 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 			// 传入 0 或负数表示清除降级分组
 			group.FallbackGroupID = nil
 		}
+	}
+	if err := s.validateCodexGroupRestriction(ctx, id, group.Platform, group.CodexOnly, group.FallbackGroupID); err != nil {
+		return nil, err
 	}
 	fallbackOnInvalidRequest := group.FallbackGroupIDOnInvalidRequest
 	if input.FallbackGroupIDOnInvalidRequest != nil {

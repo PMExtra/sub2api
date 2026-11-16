@@ -69,6 +69,9 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 		return
 	}
 
+	if !h.prepareCodexGroupRouting(c, apiKey, body) {
+		return
+	}
 	modelResult := gjson.GetBytes(body, "model")
 	if !modelResult.Exists() || modelResult.Type != gjson.String || strings.TrimSpace(modelResult.String()) == "" {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "model is required")

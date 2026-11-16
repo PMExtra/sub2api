@@ -300,6 +300,7 @@ func (s *OpenAIGatewayService) OpenAIImageSizeTierUnsupported(
 	requiredCapability OpenAIEndpointCapability,
 	requiredImageCapability OpenAIImagesCapability,
 ) (string, bool) {
+	groupID = OpenAIRoutingGroupID(ctx, groupID)
 	tier, ok := ClassifyImageBillingTier(size)
 	if !ok || s == nil || s.accountRepo == nil {
 		return "", false

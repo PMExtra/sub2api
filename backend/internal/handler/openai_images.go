@@ -62,6 +62,9 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		return
 	}
 
+	if !h.prepareCodexGroupRouting(c, apiKey, body) {
+		return
+	}
 	if isMultipartImagesContentType(c.GetHeader("Content-Type")) {
 		setOpsRequestContext(c, "", false)
 	} else {

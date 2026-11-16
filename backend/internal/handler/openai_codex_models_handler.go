@@ -34,21 +34,25 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 		return
 	}
 
+	if !h.prepareCodexGroupRouting(c, apiKey, nil) {
+		return
+	}
+	routingGroup := service.OpenAIRoutingGroup(c.Request.Context(), apiKey.Group)
 	ifNoneMatch := c.GetHeader("If-None-Match")
 	// 固定账号分支：开启后只用选定账号拉取 manifest，不经过调度器；
 	// 全部不可用/全部失败时按 FallbackToScheduler 决定回退调度器或返回错误。
 	if apiKey.Group.Platform == service.PlatformOpenAI &&
-		apiKey.Group.CodexModelsManifestConfig.Enabled {
+		routingGroup.CodexModelsManifestConfig.Enabled {
 		pinnedManifest, pinnedAccount, pinnedErr := h.gatewayService.FetchPinnedCodexModelsManifest(
 			c.Request.Context(),
-			apiKey.Group,
+			routingGroup,
 			c.Query("client_version"),
 		)
 		if pinnedErr != nil {
 			if c.Request.Context().Err() != nil {
 				return
 			}
-			if !apiKey.Group.CodexModelsManifestConfig.FallbackToScheduler {
+			if !routingGroup.CodexModelsManifestConfig.FallbackToScheduler {
 				if errors.Is(pinnedErr, service.ErrNoPinnedCodexModelsAccounts) {
 					h.errorResponse(c, http.StatusServiceUnavailable, "upstream_error", "No available pinned OpenAI accounts")
 					return
@@ -72,7 +76,7 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 		}
 	}
 
-	if !apiKey.Group.CodexModelsManifestConfig.Enabled {
+	if !routingGroup.CodexModelsManifestConfig.Enabled {
 		configuredManifest, configured, err := h.gatewayService.BuildGroupConfiguredCodexModelsManifest(
 			c.Request.Context(),
 			apiKey.Group,
