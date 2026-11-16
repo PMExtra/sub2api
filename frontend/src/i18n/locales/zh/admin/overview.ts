@@ -1237,6 +1237,15 @@ export default {
         fallbackHint: '非 Claude Code 请求将使用此分组，留空则直接拒绝',
         noFallback: '不降级（直接拒绝）'
       },
+      codex: {
+        title: 'Codex 客户端限制',
+        tooltip: '启用后，仅通过 Codex 客户端检测的请求留在此分组，其他请求降级到指定 OpenAI 分组。权限、价格和用量归属仍按原分组。',
+        enabled: '仅限 Codex 官方客户端',
+        disabled: '允许所有客户端',
+        fallbackGroup: '降级分组',
+        fallbackHint: '未通过 Codex 客户端检测的请求使用此分组，留空则直接拒绝；目标账号应允许相应客户端',
+        noFallback: '不降级（直接拒绝）'
+      },
       openaiMessages: {
         title: 'OpenAI Messages 调度配置',
         allowDispatch: '允许 /v1/messages 调度',

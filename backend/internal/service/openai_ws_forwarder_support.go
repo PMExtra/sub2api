@@ -441,7 +441,7 @@ func getOpenAIGroupIDFromContext(c *gin.Context) int64 {
 	if !ok || apiKey == nil || apiKey.GroupID == nil {
 		return 0
 	}
-	return *apiKey.GroupID
+	return *OpenAIRoutingGroupID(c.Request.Context(), apiKey.GroupID)
 }
 
 // SelectAccountByPreviousResponseID 按 previous_response_id 命中账号粘连。
@@ -469,6 +469,7 @@ func (s *OpenAIGatewayService) selectAccountByPreviousResponseIDForCapability(
 	requiredCapability OpenAIEndpointCapability,
 	requireCompact bool,
 ) (*AccountSelectionResult, error) {
+	groupID = OpenAIRoutingGroupID(ctx, groupID)
 	if s == nil {
 		return nil, nil
 	}
@@ -529,6 +530,7 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 	requiredCapability OpenAIEndpointCapability,
 	requireCompact bool,
 ) (int64, *Account, string, OpenAIWSStateStore) {
+	groupID = OpenAIRoutingGroupID(ctx, groupID)
 	if s == nil {
 		return 0, nil, "", nil
 	}

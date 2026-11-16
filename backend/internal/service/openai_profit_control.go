@@ -215,6 +215,7 @@ func (s *OpenAIGatewayService) withOpenAIProfitControlGate(ctx context.Context, 
 }
 
 func (s *OpenAIGatewayService) resolveOpenAIProfitControlGate(ctx context.Context, groupID *int64) *openAIProfitControlGate {
+	groupID = OpenAIRoutingGroupID(ctx, groupID)
 	if s == nil || groupID == nil || *groupID <= 0 {
 		return nil
 	}

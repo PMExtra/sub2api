@@ -472,6 +472,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 使用 gjson 只读提取字段做校验，避免完整 Unmarshal
+	if !h.prepareCodexGroupRouting(c, apiKey, body) {
+		return
+	}
 	modelResult := gjson.GetBytes(body, "model")
 	if !modelResult.Exists() || modelResult.Type != gjson.String || modelResult.String() == "" {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "model is required")
@@ -535,7 +538,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		}
 		groupID := int64(0)
 		if apiKey.GroupID != nil {
-			groupID = *apiKey.GroupID
+			groupID = *service.OpenAIRoutingGroupID(c.Request.Context(), apiKey.GroupID)
 		}
 		owned, ownershipErr := h.gatewayService.ValidateOpenAIHTTPResponseOwner(
 			c.Request.Context(),
@@ -1238,6 +1241,9 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		return
 	}
 
+	if !h.prepareCodexGroupRouting(c, apiKey, body) {
+		return
+	}
 	modelResult := gjson.GetBytes(body, "model")
 	if !modelResult.Exists() || modelResult.Type != gjson.String || modelResult.String() == "" {
 		h.anthropicErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "model is required")
@@ -2598,6 +2604,18 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "invalid JSON payload")
 		return
 	}
+	routingCtx, routingErr := h.gatewayService.WithCodexGroupRouting(c, apiKey.Group, firstMessage)
+	if routingErr != nil {
+		if errors.Is(routingErr, service.ErrCodexOnly) {
+			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalPolicyDenied)
+			closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, routingErr.Error())
+		} else {
+			closeOpenAIClientWS(wsConn, coderws.StatusTryAgainLater, "Codex fallback group is unavailable")
+		}
+		return
+	}
+	ctx = routingCtx
+	c.Request = c.Request.WithContext(ctx)
 	reqModel := strings.TrimSpace(gjson.GetBytes(firstMessage, "model").String())
 	if reqModel == "" {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "model is required in first response.create payload")

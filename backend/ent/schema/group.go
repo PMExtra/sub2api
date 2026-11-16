@@ -203,14 +203,17 @@ func (Group) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
 			Comment("分组逐模型定价；优先级高于渠道和内置定价"),
 
-		// Claude Code 客户端限制 (added by migration 029)
+		// 官方客户端限制（Claude Code / Codex）
 		field.Bool("claude_code_only").
 			Default(false).
 			Comment("是否仅允许 Claude Code 客户端"),
+		field.Bool("codex_only").
+			Default(false).
+			Comment("是否仅允许 Codex 官方客户端（OpenAI 分组）"),
 		field.Int64("fallback_group_id").
 			Optional().
 			Nillable().
-			Comment("非 Claude Code 请求降级使用的分组 ID"),
+			Comment("非官方客户端请求降级使用的分组 ID"),
 		field.Int64("fallback_group_id_on_invalid_request").
 			Optional().
 			Nillable().

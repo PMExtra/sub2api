@@ -108,7 +108,9 @@ type Group struct {
 	ModelPricing jsontext.Value `json:"model_pricing,omitempty"`
 	// 是否仅允许 Claude Code 客户端
 	ClaudeCodeOnly bool `json:"claude_code_only,omitempty"`
-	// 非 Claude Code 请求降级使用的分组 ID
+	// 是否仅允许 Codex 官方客户端（OpenAI 分组）
+	CodexOnly bool `json:"codex_only,omitempty"`
+	// 非官方客户端请求降级使用的分组 ID
 	FallbackGroupID *int64 `json:"fallback_group_id,omitempty"`
 	// 无效请求兜底使用的分组 ID
 	FallbackGroupIDOnInvalidRequest *int64 `json:"fallback_group_id_on_invalid_request,omitempty"`
@@ -266,7 +268,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case group.FieldI18n, group.FieldVideoModelPrices, group.FieldModelPricing, group.FieldModelRouting, group.FieldSupportedModelScopes, group.FieldMessagesDispatchModelConfig, group.FieldModelAllowlist, group.FieldCodexModelsManifestConfig, group.FieldReasoningEffortMappings:
 			values[i] = new([]byte)
-		case group.FieldPeakRateEnabled, group.FieldIsExclusive, group.FieldAllowImageGeneration, group.FieldAllowBatchImageGeneration, group.FieldImageCountBilling, group.FieldImageRateIndependent, group.FieldVideoRateIndependent, group.FieldLongContextPricingEnabled, group.FieldClaudeCodeOnly, group.FieldModelRoutingEnabled, group.FieldMcpXMLInject, group.FieldAllowMessagesDispatch, group.FieldAllowLive, group.FieldForceOpenaiFast, group.FieldForceOpenaiUltrafast, group.FieldFreeOpenaiFast, group.FieldRequireOauthOnly, group.FieldRequirePrivacySet, group.FieldProfitControlEnabled:
+		case group.FieldPeakRateEnabled, group.FieldIsExclusive, group.FieldAllowImageGeneration, group.FieldAllowBatchImageGeneration, group.FieldImageCountBilling, group.FieldImageRateIndependent, group.FieldVideoRateIndependent, group.FieldLongContextPricingEnabled, group.FieldClaudeCodeOnly, group.FieldCodexOnly, group.FieldModelRoutingEnabled, group.FieldMcpXMLInject, group.FieldAllowMessagesDispatch, group.FieldAllowLive, group.FieldForceOpenaiFast, group.FieldForceOpenaiUltrafast, group.FieldFreeOpenaiFast, group.FieldRequireOauthOnly, group.FieldRequirePrivacySet, group.FieldProfitControlEnabled:
 			values[i] = new(sql.NullBool)
 		case group.FieldRateMultiplier, group.FieldPeakRateMultiplier, group.FieldDailyLimitUsd, group.FieldWeeklyLimitUsd, group.FieldMonthlyLimitUsd, group.FieldImageRateMultiplier, group.FieldImagePrice1k, group.FieldImagePrice2k, group.FieldImagePrice4k, group.FieldBatchImageDiscountMultiplier, group.FieldBatchImageHoldMultiplier, group.FieldVideoRateMultiplier, group.FieldVideoPrice480p, group.FieldVideoPrice720p, group.FieldVideoPrice1080p, group.FieldWebSearchPricePerCall, group.FieldSearchPricePer1k, group.FieldAudioRealtimePricePerMin, group.FieldAudioTtsPricePerMillionChars, group.FieldAudioSttPricePerHour, group.FieldProfitMinMargin, group.FieldProfitSafetyBuffer:
 			values[i] = new(sql.NullFloat64)
@@ -583,6 +585,12 @@ func (_m *Group) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field claude_code_only", values[i])
 			} else if value.Valid {
 				_m.ClaudeCodeOnly = value.Bool
+			}
+		case group.FieldCodexOnly:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field codex_only", values[i])
+			} else if value.Valid {
+				_m.CodexOnly = value.Bool
 			}
 		case group.FieldFallbackGroupID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -989,6 +997,9 @@ func (_m *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("claude_code_only=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ClaudeCodeOnly))
+	builder.WriteString(", ")
+	builder.WriteString("codex_only=")
+	builder.WriteString(fmt.Sprintf("%v", _m.CodexOnly))
 	builder.WriteString(", ")
 	if v := _m.FallbackGroupID; v != nil {
 		builder.WriteString("fallback_group_id=")
