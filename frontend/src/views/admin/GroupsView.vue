@@ -1478,6 +1478,62 @@
           </div>
         </div>
 
+        <!-- Codex 客户端限制（仅 openai 平台） -->
+        <div v-if="createForm.platform === 'openai'" class="border-t pt-4">
+          <div class="mb-1.5 flex items-center gap-1">
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t("admin.groups.codex.title") }}
+            </label>
+            <!-- Help Tooltip -->
+            <div class="group relative inline-flex">
+              <Icon
+                name="questionCircle"
+                size="sm"
+                :stroke-width="2"
+                class="cursor-help text-gray-400 transition-colors hover:text-primary-500 dark:text-gray-500 dark:hover:text-primary-400"
+              />
+              <div
+                class="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-72 opacity-0 transition-all duration-200 group-hover:pointer-events-auto group-hover:opacity-100"
+              >
+                <div
+                  class="rounded-lg bg-gray-900 p-3 text-white shadow-lg dark:bg-gray-800"
+                >
+                  <p class="text-xs leading-relaxed text-gray-300">
+                    {{ t("admin.groups.codex.tooltip") }}
+                  </p>
+                  <div
+                    class="absolute -bottom-1.5 left-3 h-3 w-3 rotate-45 bg-gray-900 dark:bg-gray-800"
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <Toggle v-model="createForm.codex_only" />
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+              {{
+                createForm.codex_only
+                  ? t("admin.groups.codex.enabled")
+                  : t("admin.groups.codex.disabled")
+              }}
+            </span>
+          </div>
+          <!-- 降级分组选择（仅当启用 codex_only 时显示） -->
+          <div v-if="createForm.codex_only" class="mt-3">
+            <label class="input-label">{{
+              t("admin.groups.codex.fallbackGroup")
+            }}</label>
+            <Select
+              v-model="createForm.fallback_group_id"
+              :options="fallbackGroupOptions"
+              :placeholder="t('admin.groups.codex.noFallback')"
+            />
+            <p class="input-hint">
+              {{ t("admin.groups.codex.fallbackHint") }}
+            </p>
+          </div>
+        </div>
+
         <!-- Codex 网页搜索按次计费（仅 openai 平台） -->
         <div
           v-if="createForm.platform === 'openai'"
@@ -3169,6 +3225,62 @@
           </div>
         </div>
 
+        <!-- Codex 客户端限制（仅 openai 平台） -->
+        <div v-if="editForm.platform === 'openai'" class="border-t pt-4">
+          <div class="mb-1.5 flex items-center gap-1">
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t("admin.groups.codex.title") }}
+            </label>
+            <!-- Help Tooltip -->
+            <div class="group relative inline-flex">
+              <Icon
+                name="questionCircle"
+                size="sm"
+                :stroke-width="2"
+                class="cursor-help text-gray-400 transition-colors hover:text-primary-500 dark:text-gray-500 dark:hover:text-primary-400"
+              />
+              <div
+                class="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-72 opacity-0 transition-all duration-200 group-hover:pointer-events-auto group-hover:opacity-100"
+              >
+                <div
+                  class="rounded-lg bg-gray-900 p-3 text-white shadow-lg dark:bg-gray-800"
+                >
+                  <p class="text-xs leading-relaxed text-gray-300">
+                    {{ t("admin.groups.codex.tooltip") }}
+                  </p>
+                  <div
+                    class="absolute -bottom-1.5 left-3 h-3 w-3 rotate-45 bg-gray-900 dark:bg-gray-800"
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <Toggle v-model="editForm.codex_only" />
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+              {{
+                editForm.codex_only
+                  ? t("admin.groups.codex.enabled")
+                  : t("admin.groups.codex.disabled")
+              }}
+            </span>
+          </div>
+          <!-- 降级分组选择（仅当启用 codex_only 时显示） -->
+          <div v-if="editForm.codex_only" class="mt-3">
+            <label class="input-label">{{
+              t("admin.groups.codex.fallbackGroup")
+            }}</label>
+            <Select
+              v-model="editForm.fallback_group_id"
+              :options="fallbackGroupOptionsForEdit"
+              :placeholder="t('admin.groups.codex.noFallback')"
+            />
+            <p class="input-hint">
+              {{ t("admin.groups.codex.fallbackHint") }}
+            </p>
+          </div>
+        </div>
+
         <!-- Codex 网页搜索按次计费（仅 openai 平台） -->
         <div
           v-if="editForm.platform === 'openai'"
@@ -4777,15 +4889,16 @@ const subscriptionTypeOptions = computed(() => [
   { value: "subscription", label: t("admin.groups.subscription.subscription") },
 ]);
 
-// 降级分组选项（创建时）- 仅包含 anthropic 平台且未启用 claude_code_only 的分组
+// 降级分组选项（创建时）：同平台、未启用客户端限制的活跃分组
 const fallbackGroupOptions = computed(() => {
   const options: { value: number | null; label: string }[] = [
     { value: null, label: t("admin.groups.claudeCode.noFallback") },
   ];
   const eligibleGroups = groups.value.filter(
     (g) =>
-      g.platform === "anthropic" &&
+      g.platform === createForm.platform &&
       !g.claude_code_only &&
+      !g.codex_only &&
       g.status === "active",
   );
   eligibleGroups.forEach((g) => {
@@ -4802,8 +4915,9 @@ const fallbackGroupOptionsForEdit = computed(() => {
   const currentId = editingGroup.value?.id;
   const eligibleGroups = groups.value.filter(
     (g) =>
-      g.platform === "anthropic" &&
+      g.platform === editForm.platform &&
       !g.claude_code_only &&
+      !g.codex_only &&
       g.status === "active" &&
       g.id !== currentId,
   );
@@ -5096,8 +5210,9 @@ const createForm = reactive({
   profit_control_enabled: false,
   profit_min_margin_percent: 0,
   profit_safety_buffer_percent: 0,
-  // Claude Code 客户端限制（仅 anthropic 平台使用）
+  // 官方客户端限制与降级分组（Anthropic / OpenAI）
   claude_code_only: false,
+  codex_only: false,
   fallback_group_id: null as number | null,
   fallback_group_id_on_invalid_request: null as number | null,
   // OpenAI Messages 调度配置（仅 openai 平台使用）
@@ -5466,8 +5581,9 @@ const editForm = reactive({
   profit_control_enabled: false,
   profit_min_margin_percent: 0,
   profit_safety_buffer_percent: 0,
-  // Claude Code 客户端限制（仅 anthropic 平台使用）
+  // 官方客户端限制与降级分组（Anthropic / OpenAI）
   claude_code_only: false,
+  codex_only: false,
   fallback_group_id: null as number | null,
   fallback_group_id_on_invalid_request: null as number | null,
   // OpenAI Messages 调度配置（仅 openai 平台使用）
@@ -5943,6 +6059,7 @@ const closeCreateModal = () => {
   createForm.profit_min_margin_percent = 0;
   createForm.profit_safety_buffer_percent = 0;
   createForm.claude_code_only = false;
+  createForm.codex_only = false;
   createForm.fallback_group_id = null;
   createForm.fallback_group_id_on_invalid_request = null;
   resetMessagesDispatchFormState(createForm);
@@ -6249,6 +6366,7 @@ const handleEdit = async (group: AdminGroup) => {
     group.profit_safety_buffer ?? 0,
   );
   editForm.claude_code_only = group.claude_code_only || false;
+  editForm.codex_only = group.codex_only || false;
   editForm.fallback_group_id = group.fallback_group_id;
   editForm.fallback_group_id_on_invalid_request =
     group.fallback_group_id_on_invalid_request;
@@ -6842,6 +6960,11 @@ watch(
 watch(
   () => createForm.platform,
   (newVal) => {
+    if (newVal !== "openai") createForm.codex_only = false;
+    const fallback = groups.value.find(g => g.id === createForm.fallback_group_id);
+    if (fallback && fallback.platform !== newVal) {
+      createForm.fallback_group_id = null;
+    }
     if (!["anthropic", "antigravity"].includes(newVal)) {
       createForm.fallback_group_id_on_invalid_request = null;
     }
@@ -6900,6 +7023,11 @@ watch(
 watch(
   () => editForm.platform,
   (newVal) => {
+    if (newVal !== "openai") editForm.codex_only = false;
+    const fallback = groups.value.find(g => g.id === editForm.fallback_group_id);
+    if (fallback && fallback.platform !== newVal) {
+      editForm.fallback_group_id = null;
+    }
     if (!["anthropic", "antigravity"].includes(newVal)) {
       editForm.fallback_group_id_on_invalid_request = null;
     }

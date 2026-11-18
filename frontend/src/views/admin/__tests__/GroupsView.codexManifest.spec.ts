@@ -118,6 +118,7 @@ const sourceGroup = {
   peak_end: "",
   peak_rate_multiplier: 1,
   claude_code_only: false,
+  codex_only: false,
   fallback_group_id: null,
   fallback_group_id_on_invalid_request: null,
   allow_messages_dispatch: false,
@@ -343,6 +344,50 @@ describe("GroupsView Codex manifest binding", () => {
     await flushPromises();
     expect(wrapper.find('input[name="codex_config_default_model"]').exists()).toBe(false);
     expect(wrapper.find('input[name="codex_config_review_model"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("saves the OpenAI Codex restriction and only offers unrestricted OpenAI fallback groups", async () => {
+    const fallback = { ...sourceGroup, id: 43, name: "Exclusive fallback", is_exclusive: true };
+    const restricted = { ...sourceGroup, id: 44, name: "Codex only", codex_only: true };
+    const anthropic = { ...sourceGroup, id: 45, name: "Anthropic", platform: "anthropic" };
+    listGroups.mockResolvedValue({ items: [sourceGroup, fallback, restricted, anthropic], total: 4, page: 1, page_size: 20, pages: 1 });
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-tour="groups-create-btn"]').trigger("click");
+    expect(wrapper.text()).not.toContain("admin.groups.codex.title");
+    wrapper.getComponent('[data-tour="group-form-platform"]').vm.$emit("update:modelValue", "openai");
+    await flushPromises();
+    const section = wrapper.findAll("div.border-t.pt-4").find(div => div.text().includes("admin.groups.codex.title"));
+    expect(section).toBeTruthy();
+    await section!.get('button[role="switch"]').trigger("click");
+    const select = wrapper.getComponent('select-stub[placeholder="admin.groups.codex.noFallback"]');
+    const options = select.vm.$props.options as Array<{ value: number | null }>;
+    expect(options.map(option => option.value)).toEqual([null, 42, 43]);
+    select.vm.$emit("update:modelValue", 43);
+    await wrapper.get('[data-tour="group-form-name"]').setValue("Codex group");
+    await wrapper.get("#create-group-form").trigger("submit");
+    await flushPromises();
+    expect(createGroup).toHaveBeenCalledWith(expect.objectContaining({ platform: "openai", codex_only: true, fallback_group_id: 43 }));
+    wrapper.unmount();
+  });
+
+  it("preserves the Codex restriction and exclusive fallback when editing", async () => {
+    const source = { ...sourceGroup, codex_only: true, fallback_group_id: 43 };
+    const fallback = { ...sourceGroup, id: 43, name: "Exclusive fallback", is_exclusive: true };
+    listGroups.mockResolvedValue({ items: [source, fallback], total: 2, page: 1, page_size: 20, pages: 1 });
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.findAll("button").find(button => button.text().includes("common.edit"))!.trigger("click");
+    await flushPromises();
+    const section = wrapper.findAll("div.border-t.pt-4").find(div => div.text().includes("admin.groups.codex.title"));
+    expect(section!.get('button[role="switch"]').attributes("aria-checked")).toBe("true");
+    const select = wrapper.getComponent('select-stub[placeholder="admin.groups.codex.noFallback"]');
+    expect(select.vm.$props.modelValue).toBe(43);
+    expect((select.vm.$props.options as Array<{ value: number | null }>).map(option => option.value)).toEqual([null, 43]);
+    await wrapper.get("#edit-group-form").trigger("submit");
+    await flushPromises();
+    expect(updateGroup).toHaveBeenCalledWith(42, expect.objectContaining({ codex_only: true, fallback_group_id: 43 }));
     wrapper.unmount();
   });
 

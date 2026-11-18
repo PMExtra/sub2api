@@ -43,6 +43,9 @@ func (h *OpenAIGatewayHandler) Live(c *gin.Context) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return
 	}
+	if !h.prepareCodexGroupRouting(c, apiKey, request.Session) {
+		return
+	}
 	model := strings.TrimSpace(gjson.GetBytes(request.Session, "model").String())
 	if !compositeTargetPlatformAllowed(c, apiKey, model, service.PlatformOpenAI) {
 		h.errorResponse(c, http.StatusNotFound, "not_found_error", "Live only supports OpenAI models for Composite groups")

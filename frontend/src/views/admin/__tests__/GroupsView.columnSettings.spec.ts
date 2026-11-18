@@ -118,6 +118,7 @@ const createGroup = (overrides: Partial<AdminGroup> = {}): AdminGroup => ({
   image_price_2k: null,
   image_price_4k: null,
   claude_code_only: false,
+  codex_only: false,
   fallback_group_id: null,
   fallback_group_id_on_invalid_request: null,
   allow_messages_dispatch: false,

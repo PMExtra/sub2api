@@ -388,6 +388,7 @@ func TestAPIContracts(t *testing.T) {
 						"claude_code_only": false,
 						"codex_config_default_model": "",
 						"codex_config_review_model": "",
+						"codex_only": false,
 						"allow_messages_dispatch": false,
 						"allow_live": false,
 						"fallback_group_id": null,

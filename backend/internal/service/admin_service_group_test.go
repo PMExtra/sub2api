@@ -2497,3 +2497,30 @@ func TestAdminService_UpdateGroup_ForceOpenAIUltrafast(t *testing.T) {
 		require.True(t, repo.updated.ForceOpenAIUltrafast)
 	})
 }
+
+func TestAdminService_UpdateGroup_StaleFallbackDoesNotBlockDisablingCodexOnly(t *testing.T) {
+	deletedFallbackID := int64(2)
+	existing := &Group{ID: 1, Name: "codex", Platform: PlatformOpenAI, Status: StatusActive,
+		CodexOnly: true, FallbackGroupID: &deletedFallbackID}
+	repo := &groupRepoStubForAdmin{getByIDByID: map[int64]*Group{1: existing}}
+	svc := &adminServiceImpl{groupRepo: repo}
+
+	codexOnly := false
+	submittedFallback := deletedFallbackID
+	group, err := svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{
+		CodexOnly:       &codexOnly,
+		FallbackGroupID: &submittedFallback,
+	})
+	require.NoError(t, err)
+	require.False(t, group.CodexOnly)
+
+	// Still enforced while the restriction is on, or when the fallback changes.
+	existing.CodexOnly = true
+	codexOnly = true
+	_, err = svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{CodexOnly: &codexOnly, FallbackGroupID: &submittedFallback})
+	require.ErrorContains(t, err, "fallback group not found")
+	codexOnly = false
+	otherMissing := int64(3)
+	_, err = svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{CodexOnly: &codexOnly, FallbackGroupID: &otherMissing})
+	require.ErrorContains(t, err, "fallback group not found")
+}
