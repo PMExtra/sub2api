@@ -2176,6 +2176,7 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 	previousResponseCanMove bool,
 	useUpstreamTokenCost bool,
 ) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
+	groupID = OpenAIRoutingGroupID(ctx, groupID)
 	selection, decision, err := s.selectAccountWithSchedulerBySize(ctx, groupID, previousResponseID, sessionHash, requestedModel, excludedIDs, requiredTransport, requiredCapability, requiredImageCapability, requireCompact, platform, previousResponseCanMove, useUpstreamTokenCost)
 	if err == nil || openAIProxyStreamQuarantineBypassed(ctx) {
 		return selection, decision, err
@@ -2258,6 +2259,9 @@ func (s *OpenAIGatewayService) loadOpenAIGroupRequiresPrivacySet(ctx context.Con
 	// 直连请求的被调度分组即认证分组，复用 auth 快照；composite 等 ID 不一致时回源。
 	if ctxGroup, ok := ctx.Value(ctxkey.Group).(*Group); ok && IsGroupContextValid(ctxGroup) && ctxGroup.ID == *groupID {
 		return ctxGroup.RequirePrivacySet
+	}
+	if routed := openAIResolvedFallbackGroup(ctx, *groupID); routed != nil {
+		return routed.RequirePrivacySet
 	}
 	if s.schedulerSnapshot == nil {
 		return false
