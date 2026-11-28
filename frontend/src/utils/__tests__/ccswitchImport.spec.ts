@@ -141,19 +141,43 @@ describe('ccswitchImport utils', () => {
   })
 
   it.each([
-    { platform: 'anthropic' as GroupPlatform, clientType: 'claude' as const, app: 'claude' },
-    { platform: 'gemini' as GroupPlatform, clientType: 'gemini' as const, app: 'gemini' }
-  ])('does not add a model parameter for $platform imports', ({ platform, clientType, app }) => {
+    { platform: 'anthropic' as const, endpoint: baseInput.baseUrl },
+    { platform: 'antigravity' as const, endpoint: `${baseInput.baseUrl}/antigravity` }
+  ])('includes environment settings for $platform Claude Code imports', ({ platform, endpoint }) => {
     const params = paramsFromDeeplink(
       buildCcSwitchImportDeeplink({
         ...baseInput,
         platform,
-        clientType,
+        clientType: 'claude',
         codexConfigDefaultModel: 'configured-model'
       })
     )
 
-    expect(params.get('app')).toBe(app)
+    expect(params.get('app')).toBe('claude')
+    expect(params.get('endpoint')).toBe(endpoint)
+    expect(params.get('apiKey')).toBe(baseInput.apiKey)
+    expect(params.has('model')).toBe(false)
+    expect(params.get('configFormat')).toBe('json')
+    expect(JSON.parse(atob(params.get('config') || ''))).toEqual({
+      env: {
+        CLAUDE_CODE_PROMPT_CACHE_TTL: '1h',
+        CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL: '5m',
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+      }
+    })
+  })
+
+  it('imports Gemini without an embedded config or a model parameter', () => {
+    const params = paramsFromDeeplink(
+      buildCcSwitchImportDeeplink({
+        ...baseInput,
+        platform: 'gemini',
+        clientType: 'gemini',
+        codexConfigDefaultModel: 'configured-model'
+      })
+    )
+
+    expect(params.get('app')).toBe('gemini')
     expect(params.get('endpoint')).toBe(baseInput.baseUrl)
     expect(params.has('model')).toBe(false)
     expect(params.has('config')).toBe(false)
