@@ -275,6 +275,7 @@ import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { buildCodexModelCatalogUrl, fetchCodexModelsManifest } from '@/api/codex'
 import type { GroupPlatform } from '@/types'
+import { CLAUDE_CODE_PROMPT_CACHE_ENV } from '@/utils/claudeCodeConfig'
 import { buildCodexApiKeyAuthConfig } from '@/utils/codexAuthConfig'
 import {
   findCodexCatalogModel,
@@ -904,14 +905,15 @@ $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
     ? '~/.claude/settings.json'
     : '%USERPROFILE%\\.claude\\settings.json'
 
-  const vscodeContent = `{
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "env": {
-    "ANTHROPIC_BASE_URL": "${baseUrl}",
-    "ANTHROPIC_AUTH_TOKEN": "${apiKey}",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
-  }
-}`
+  const vscodeContent = JSON.stringify({
+    $schema: 'https://json.schemastore.org/claude-code-settings.json',
+    env: {
+      ANTHROPIC_BASE_URL: baseUrl,
+      ANTHROPIC_AUTH_TOKEN: apiKey,
+      ...CLAUDE_CODE_PROMPT_CACHE_ENV,
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+    }
+  }, null, 2)
 
   return [
     { path, content },
@@ -972,7 +974,10 @@ function generateGrokClaudeFiles(baseUrl: string, apiKey: string): FileConfig[] 
       path: settingsPath,
       content: JSON.stringify({
         $schema: 'https://json.schemastore.org/claude-code-settings.json',
-        env: environment
+        env: {
+          ...environment,
+          ...CLAUDE_CODE_PROMPT_CACHE_ENV
+        }
       }, null, 2),
       hint: t('keys.useKeyModal.claudeSettingsHint')
     }

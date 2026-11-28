@@ -1,4 +1,5 @@
 import type { GroupPlatform } from '@/types'
+import { CLAUDE_CODE_PROMPT_CACHE_ENV } from '@/utils/claudeCodeConfig'
 import { buildCodexApiKeyAuthConfig } from '@/utils/codexAuthConfig'
 
 export const OPENAI_CC_SWITCH_CODEX_MODEL = 'gpt-6.1-sol'
@@ -112,7 +113,15 @@ export function buildCcSwitchImportDeeplink(input: CcSwitchImportDeeplinkInput):
     entries.splice(2, 0, ['model', config.model])
   }
 
-  if (config.app === 'codex') {
+  let payload: string | undefined
+  if (config.app === 'claude') {
+    payload = JSON.stringify({
+      env: {
+        ...CLAUDE_CODE_PROMPT_CACHE_ENV,
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+      }
+    })
+  } else if (config.app === 'codex') {
     // CC Switch's embedded-config import preserves provider auth and headers.
     // It deliberately leaves global [features] settings to the user.
     const codexConfig = `model_provider = "sub2api"
@@ -125,7 +134,10 @@ base_url = ${JSON.stringify(config.endpoint)}
 wire_api = "responses"
 ${buildCodexApiKeyAuthConfig(input.apiKey)}
 `
-    const payload = JSON.stringify({ config: codexConfig })
+    payload = JSON.stringify({ config: codexConfig })
+  }
+
+  if (payload !== undefined) {
     const bytes = new TextEncoder().encode(payload)
     entries.push(['config', btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(''))])
   }
